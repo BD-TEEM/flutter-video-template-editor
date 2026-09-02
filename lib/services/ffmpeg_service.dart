@@ -220,8 +220,7 @@ class FFmpegService {
       final session = await FFmpegKit.executeWithArguments(
         command,
         onStatistics: (Statistics stats) {
-          final progress = (stats.getTime() / (imagePaths.length * durationPerImageMs))
-              .clamp(0.0, 1.0);
+          final progress = (stats.getTime() / (imagePaths.length * durationPerImageMs))\n              .clamp(0.0, 1.0);
           _progressController.add(progress);
         },
       );
@@ -313,14 +312,7 @@ class FFmpegService {
       _statusController.add('Adding watermark...');
 
       final opacityFilter = (opacity * 100).toInt();
-      final filterComplex = '
-        [0:v][1:v]overlay=$xPos:$yPos:enable=\'gte(t,0)\':w=$width:h=$height,
-        format=yuv420p[v];
-        [v]alphaextract[a];
-        color=c=white:s=${width}x${height}[base];
-        [base][a]alphamerge[mask];
-        [0:v][mask]overlay=$xPos:$yPos:enable=\'gte(t,0)\'[out]
-      ';
+      final filterComplex = '''[0][1]overlay=$xPos:$yPos:enable='gte(t,0)':w=$width:h=$height''';
 
       final command = [
         '-i',
@@ -328,7 +320,7 @@ class FFmpegService {
         '-i',
         watermarkPath,
         '-filter_complex',
-        '[0][1]overlay=$xPos:$yPos:enable=\'gte(t,0)\'',
+        filterComplex,
         '-c:a',
         'copy',
         outputPath,
@@ -372,16 +364,8 @@ class FFmpegService {
     try {
       _statusController.add('Adding text overlay...');
 
-      final escapedText = text.replaceAll("'", "'\\\''");
-      final filterComplex = '
-        drawtext=
-          text=\'$escapedText\':
-          fontsize=$fontSize:
-          fontcolor=$fontColor:
-          x=$xPos:
-          y=$yPos:
-          fontfile=/system/fonts/DroidSans.ttf
-      ';
+      final escapedText = text.replaceAll("'", "\\'");
+      final filterComplex = '''drawtext=text='$escapedText':fontsize=$fontSize:fontcolor=$fontColor:x=$xPos:y=$yPos:fontfile=/system/fonts/DroidSans.ttf''';
 
       final command = [
         '-i',
