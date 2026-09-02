@@ -1,0 +1,82 @@
+name: flutter_video_template_editor
+description: Fully functional cross-platform hybrid offline-first Flutter mobile app for video template creation and editing with cloud API integration, AI background removal, and offline rendering.
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: '>=3.10.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # State Management
+  flutter_riverpod: ^2.4.0
+  riverpod_annotation: ^2.1.0
+  
+  # Video & Media Processing
+  ffmpeg_kit_flutter: ^5.1.0
+  video_player: ^2.7.0
+  chewie: ^1.7.0
+  image_picker: ^1.0.0
+  
+  # Connectivity
+  connectivity_plus: ^5.0.0
+  
+  # Storage & Database
+  hive: ^2.2.0
+  hive_flutter: ^1.1.0
+  path_provider: ^2.1.0
+  
+  # Networking
+  http: ^1.1.0
+  dio: ^5.3.0
+  
+  # UI & Material
+  google_fonts: ^6.1.0
+  cupertino_icons: ^1.0.2
+  
+  # State & Serialization
+  freezed_annotation: ^2.4.0
+  json_annotation: ^4.8.0
+  uuid: ^4.0.0
+  intl: ^0.19.0
+  
+  # Utilities
+  permission_handler: ^11.4.0
+  file_picker: ^6.0.0
+  audio_session: ^0.1.16
+  just_audio: ^0.9.34
+  flutter_sound: ^9.2.13
+  record: ^5.0.0
+  
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  
+  flutter_lints: ^2.0.0
+  build_runner: ^2.4.0
+  freezed: ^2.4.0
+  json_serializable: ^6.7.0
+  riverpod_generator: ^2.3.0
+  hive_generator: ^2.0.0
+
+flutter:
+  uses-material-design: true
+  
+  assets:
+    - assets/templates/
+    - assets/icons/
+    - assets/fonts/
+    - assets/samples/
+  
+  fonts:
+    - family: Roboto
+      fonts:
+        - asset: assets/fonts/Roboto-Regular.ttf
+        - asset: assets/fonts/Roboto-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Roboto-Light.ttf
+          weight: 300
