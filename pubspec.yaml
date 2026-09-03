@@ -6,7 +6,7 @@ version: 1.0.0+1
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
-  flutter: '>=3.0.0'
+  flutter: '>=3.10.0'
 
 dependencies:
   flutter:
@@ -19,17 +19,15 @@ dependencies:
   state_notifier: ^1.0.0
 
   # VIDEO PROCESSING & PLAYBACK
-  ffmpeg_kit_flutter: ^5.1.1
-  ffmpeg_kit_flutter_min: ^5.1.1
-  video_player: ^2.7.0
-  chewie: ^1.7.1
-  video_compress: ^3.2.5
+  ffmpeg_kit_flutter: ^6.0.3
+  video_player: ^2.8.0
+  chewie: ^1.8.0
 
   # MEDIA & FILE HANDLING
   image_picker: ^1.0.4
   file_picker: ^6.0.0
   image: ^4.0.17
-  path_provider: ^2.1.0
+  path_provider: ^2.1.2
 
   # AUDIO PROCESSING
   just_audio: ^0.9.31
@@ -42,13 +40,12 @@ dependencies:
   hive_flutter: ^1.1.0
   isar: ^3.1.0
   sqflite: ^2.3.0
-  sqflite3_flutter_libs: ^0.5.20
 
   # NETWORK & CONNECTIVITY
   connectivity_plus: ^5.0.0
   http: ^1.1.0
   dio: ^5.3.0
-  firebase_core: ^2.20.0
+  firebase_core: ^2.24.0
   firebase_storage: ^11.4.0
   firebase_analytics: ^10.4.0
 
@@ -61,15 +58,15 @@ dependencies:
   percent_indicator: ^4.1.1
 
   # PERMISSIONS & DEVICE
-  permission_handler: ^11.4.3
-  device_info_plus: ^9.0.2
+  permission_handler: ^11.4.0
+  device_info_plus: ^9.1.0
   sensors_plus: ^1.4.0
 
   # UTILITIES
   uuid: ^4.0.0
   intl: ^0.19.0
-  share_plus: ^7.0.2
-  url_launcher: ^6.1.12
+  share_plus: ^7.2.0
+  url_launcher: ^6.2.0
   logger: ^2.0.1
 
   # JSON SERIALIZATION
@@ -82,7 +79,6 @@ dependencies:
   flutter_background_service: ^5.0.5
 
   # PLATFORM SPECIFIC
-  native_image_picker: ^0.1.0
   flutter_native_splash: ^2.3.5
 
 dev_dependencies:
