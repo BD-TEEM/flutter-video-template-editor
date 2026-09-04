@@ -60,7 +60,7 @@ dependencies:
   # PERMISSIONS & DEVICE
   permission_handler: ^11.4.0
   device_info_plus: ^9.1.0
-  sensors_plus: ^1.4.0
+  sensors_plus: ^6.0.0
 
   # UTILITIES
   uuid: ^4.0.0
