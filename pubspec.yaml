@@ -19,7 +19,7 @@ dependencies:
   state_notifier: ^1.0.0
 
   # VIDEO PROCESSING & PLAYBACK
-  ffmpeg_kit_flutter: ^6.0.3
+  ffmpeg_kit_flutter_min_gpl: ^6.0.3
   video_player: ^2.8.0
   chewie: ^1.8.0
 
