@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ffmpeg_kit_flutter_new/ffmpeg_kit.dart';
+import 'package:ffmpeg_kit_flutter_new/ffmpeg_session.dart';
 import 'package:ffmpeg_kit_flutter_new/return_code.dart';
 import 'package:ffmpeg_kit_flutter_new/statistics.dart';
 import 'package:path_provider/path_provider.dart';
@@ -57,14 +58,17 @@ class FFmpegService {
         outputPath,
       ];
 
-      final session = await FFmpegKit.executeWithArguments(
+      final session = await FFmpegSession.create(
         command,
-        onStatistics: (Statistics stats) {
+        null,
+        null,
+        (Statistics stats) {
           final progress = (stats.getTime() / (durationMs)).clamp(0.0, 1.0);
           _progressController.add(progress);
         },
       );
 
+      await FFmpegKit.executeSession(session);
       final returnCode = await session.getReturnCode();
 
       if (ReturnCode.isSuccess(returnCode)) {
@@ -201,15 +205,18 @@ class FFmpegService {
         outputPath,
       ];
 
-      final session = await FFmpegKit.executeWithArguments(
+      final session = await FFmpegSession.create(
         command,
-        onStatistics: (Statistics stats) {
+        null,
+        null,
+        (Statistics stats) {
           final progress = (stats.getTime() / (imagePaths.length * durationPerImageMs))
               .clamp(0.0, 1.0);
           _progressController.add(progress);
         },
       );
 
+      await FFmpegKit.executeSession(session);
       final returnCode = await session.getReturnCode();
 
       if (ReturnCode.isSuccess(returnCode)) {
@@ -494,14 +501,17 @@ class FFmpegService {
         outputPath,
       ];
 
-      final session = await FFmpegKit.executeWithArguments(
+      final session = await FFmpegSession.create(
         command,
-        onStatistics: (Statistics stats) {
+        null,
+        null,
+        (Statistics stats) {
           final time = stats.getTime();
           _progressController.add(time / 30000.0);
         },
       );
 
+      await FFmpegKit.executeSession(session);
       final returnCode = await session.getReturnCode();
 
       if (ReturnCode.isSuccess(returnCode)) {
