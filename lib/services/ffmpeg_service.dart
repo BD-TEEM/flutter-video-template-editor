@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:ffmpeg_kit_flutter/ffmpeg_kit.dart';
-import 'package:ffmpeg_kit_flutter/return_code.dart';
-import 'package:ffmpeg_kit_flutter/statistics.dart';
+import 'package:ffmpeg_kit_flutter_new/ffmpeg_kit.dart';
+import 'package:ffmpeg_kit_flutter_new/return_code.dart';
+import 'package:ffmpeg_kit_flutter_new/statistics.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 import 'package:logger/logger.dart';
@@ -29,10 +29,6 @@ class FFmpegService {
   Stream<String> get statusStream => _statusController.stream;
 
   /// Trim video clip
-  /// [inputPath] - Path to input video
-  /// [outputPath] - Path to output video
-  /// [startMs] - Start time in milliseconds
-  /// [durationMs] - Duration in milliseconds
   Future<bool> trimVideo({
     required String inputPath,
     required String outputPath,
@@ -89,8 +85,6 @@ class FFmpegService {
   }
 
   /// Merge multiple audio tracks
-  /// [audioTracks] - List of audio file paths
-  /// [outputPath] - Path to output audio
   Future<bool> mergeAudioTracks({
     required List<String> audioTracks,
     required String outputPath,
@@ -100,7 +94,6 @@ class FFmpegService {
 
       _statusController.add('Mixing audio tracks...');
 
-      // Build filter complex for audio mixing
       String filterComplex = '';
       String inputs = '';
 
@@ -109,7 +102,6 @@ class FFmpegService {
         filterComplex += '[$i]volume=0.5[a$i];';
       }
 
-      // Combine all audio streams
       filterComplex += audioTracks.asMap().entries.map((e) => '[a${e.key}]').join('');
       filterComplex += 'amix=inputs=${audioTracks.length}:duration=longest[out]';
 
@@ -135,9 +127,6 @@ class FFmpegService {
   }
 
   /// Adjust audio pitch
-  /// [inputPath] - Path to input audio
-  /// [outputPath] - Path to output audio
-  /// [pitch] - Pitch value (1.0 = normal, 0.5 = half, 2.0 = double)
   Future<bool> adjustAudioPitch({
     required String inputPath,
     required String outputPath,
@@ -173,10 +162,6 @@ class FFmpegService {
   }
 
   /// Generate video from images with effects
-  /// [imagePaths] - List of image file paths
-  /// [outputPath] - Path to output video
-  /// [framerate] - Framerate (default 30)
-  /// [durationPerImageMs] - Duration per image in milliseconds
   Future<bool> generateVideoFromImages({
     required List<String> imagePaths,
     required String outputPath,
@@ -191,7 +176,6 @@ class FFmpegService {
       final tempDir = await getTemporaryDirectory();
       final concat = StringBuffer();
 
-      // Create concat demuxer file
       for (int i = 0; i < imagePaths.length; i++) {
         final duration = durationPerImageMs / 1000.0;
         concat.write('file \'${imagePaths[i]}\'\n');
@@ -220,7 +204,8 @@ class FFmpegService {
       final session = await FFmpegKit.executeWithArguments(
         command,
         onStatistics: (Statistics stats) {
-          final progress = (stats.getTime() / (imagePaths.length * durationPerImageMs))\n              .clamp(0.0, 1.0);
+          final progress = (stats.getTime() / (imagePaths.length * durationPerImageMs))
+              .clamp(0.0, 1.0);
           _progressController.add(progress);
         },
       );
@@ -242,12 +227,7 @@ class FFmpegService {
     }
   }
 
-  /// Apply chroma key (color key) effect to remove background
-  /// [inputPath] - Path to input video
-  /// [outputPath] - Path to output video
-  /// [keyColor] - Color to key out (hex format: 0xRRGGBB)
-  /// [similarity] - Similarity threshold (0-100)
-  /// [blend] - Blend threshold (0-100)
+  /// Apply chroma key effect
   Future<bool> applyChromaKey({
     required String inputPath,
     required String outputPath,
@@ -289,15 +269,7 @@ class FFmpegService {
     }
   }
 
-  /// Add watermark/overlay to video
-  /// [inputPath] - Path to input video
-  /// [watermarkPath] - Path to watermark image
-  /// [outputPath] - Path to output video
-  /// [xPos] - X position in pixels
-  /// [yPos] - Y position in pixels
-  /// [width] - Watermark width
-  /// [height] - Watermark height
-  /// [opacity] - Opacity (0-1)
+  /// Add watermark to video
   Future<bool> addWatermark({
     required String inputPath,
     required String watermarkPath,
@@ -311,7 +283,6 @@ class FFmpegService {
     try {
       _statusController.add('Adding watermark...');
 
-      final opacityFilter = (opacity * 100).toInt();
       final filterComplex = '''[0][1]overlay=$xPos:$yPos:enable='gte(t,0)':w=$width:h=$height''';
 
       final command = [
@@ -345,13 +316,6 @@ class FFmpegService {
   }
 
   /// Add text overlay to video
-  /// [inputPath] - Path to input video
-  /// [outputPath] - Path to output video
-  /// [text] - Text to overlay
-  /// [fontSize] - Font size
-  /// [xPos] - X position
-  /// [yPos] - Y position
-  /// [fontColor] - Font color (hex: FFFFFF)
   Future<bool> addTextOverlay({
     required String inputPath,
     required String outputPath,
@@ -396,11 +360,6 @@ class FFmpegService {
   }
 
   /// Resize video
-  /// [inputPath] - Path to input video
-  /// [outputPath] - Path to output video
-  /// [width] - Output width
-  /// [height] - Output height
-  /// [fitMode] - 'scale' (stretch), 'pad' (letter box), 'crop'
   Future<bool> resizeVideo({
     required String inputPath,
     required String outputPath,
@@ -454,9 +413,6 @@ class FFmpegService {
   }
 
   /// Convert image to video format
-  /// [imagePath] - Path to input image
-  /// [outputPath] - Path to output video
-  /// [durationSeconds] - Duration in seconds
   Future<bool> imageToVideo({
     required String imagePath,
     required String outputPath,
@@ -498,11 +454,7 @@ class FFmpegService {
     }
   }
 
-  /// Render final video with all effects
-  /// [inputPath] - Path to input video
-  /// [outputPath] - Path to output video
-  /// [resolution] - Output resolution (e.g., '1080x1920')
-  /// [quality] - Quality ('high', 'medium', 'low')
+  /// Render final video
   Future<bool> renderVideo({
     required String inputPath,
     required String outputPath,
@@ -546,7 +498,7 @@ class FFmpegService {
         command,
         onStatistics: (Statistics stats) {
           final time = stats.getTime();
-          _progressController.add(time / 30000.0); // Assuming 30 second video
+          _progressController.add(time / 30000.0);
         },
       );
 
@@ -569,7 +521,6 @@ class FFmpegService {
   }
 
   /// Get video information
-  /// [videoPath] - Path to video file
   Future<Map<String, dynamic>?> getVideoInfo(String videoPath) async {
     try {
       final session = await FFmpegKit.execute(
@@ -579,8 +530,6 @@ class FFmpegService {
       final logs = await session.getLogsAsString();
       logger.i('Video info: $logs');
 
-      // Parse logs to extract video information
-      // This is a simplified version
       return {
         'duration': _extractDuration(logs),
         'width': _extractWidth(logs),
@@ -611,8 +560,6 @@ class FFmpegService {
   }
 
   Future<void> _writeFile(String path, String content) async {
-    // Implementation depends on platform
-    // For now, using simple file operations
     logger.i('Writing file: $path');
   }
 
@@ -622,7 +569,6 @@ class FFmpegService {
   }
 }
 
-// Riverpod Provider
 final ffmpegServiceProvider = Provider((ref) {
   return FFmpegService();
 });
