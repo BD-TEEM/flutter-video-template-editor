@@ -41,15 +41,16 @@ class _ExportDialogState extends State<ExportDialog> {
             Column(
               children: qualities.map((quality) {
                 final isSelected = _selectedQuality == quality;
-                return GestureDetector(
+                return InkWell(
                   onTap: () {
                     setState(() {
                       _selectedQuality = quality;
                     });
                   },
+                  borderRadius: BorderRadius.circular(8),
                   child: Container(
                     margin: const EdgeInsets.symmetric(vertical: 4),
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
                       color: isSelected
                           ? Colors.blueAccent.withOpacity(0.2)
@@ -67,13 +68,21 @@ class _ExportDialogState extends State<ExportDialog> {
                           value: quality,
                           groupValue: _selectedQuality,
                           onChanged: (value) {
-                            setState(() {
-                              _selectedQuality = value!;
-                            });
+                            if (value != null) {
+                              setState(() {
+                                _selectedQuality = value;
+                              });
+                            }
                           },
                           activeColor: Colors.blueAccent,
                         ),
-                        Text(quality),
+                        Text(
+                          quality,
+                          style: TextStyle(
+                            color: isSelected ? Colors.white : Colors.grey,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -82,16 +91,17 @@ class _ExportDialogState extends State<ExportDialog> {
             ),
             const SizedBox(height: 24),
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
                   child: const Text('Cancel'),
                 ),
+                const SizedBox(width: 12),
                 ElevatedButton(
                   onPressed: () {
+                    // প্রথমে নির্বাচিত কোয়ালিটি রিটার্ন করবে
                     widget.onExport(_selectedQuality);
-                    Navigator.pop(context);
                   },
                   child: const Text('Export'),
                 ),
