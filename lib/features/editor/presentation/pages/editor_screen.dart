@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart'; // FilePicker ব্যবহার করা হয়েছে
 import 'package:video_player/video_player.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:news_template_maker/core/constants/app_constants.dart';
@@ -30,7 +30,9 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
   List<String> _mediaFiles = [];
   List<AudioTrack> _audioTracks = [];
   VideoPlayerController? _videoController;
-  bool _isPlaying = false;
+  
+  bool _isVideo = false;
+  String _headlineText = "";
   double _renderProgress = 0.0;
   String _renderStatus = '';
 
@@ -62,47 +64,108 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
     await Permission.storage.request();
   }
 
+  // ১. ছবি ও ভিডিও উভয় পিক করার আপডেট ফাংশন
   Future<void> _pickMedia() async {
-    final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+    FilePickerResult? result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['jpg', 'jpeg', 'png', 'mp4', 'mov', 'avi'],
+    );
 
-    if (pickedFile != null) {
+    if (result != null && result.files.single.path != null) {
+      String path = result.files.single.path!;
       setState(() {
-        _mediaFiles.add(pickedFile.path);
+        _mediaFiles.add(path);
+        _isVideo = path.endsWith('.mp4') || path.endsWith('.mov') || path.endsWith('.avi');
       });
+      _setupPreview(path);
     }
   }
 
-  Future<void> _playPreview() async {
+  // ২. প্রিভিউ লোড করার কাস্টম ফাংশন
+  Future<void> _setupPreview(String filePath) async {
+    if (_isVideo) {
+      _videoController?.dispose();
+      _videoController = VideoPlayerController.file(File(filePath));
+      await _videoController!.initialize();
+      _videoController!.play();
+      _videoController!.setLooping(true);
+      setState(() {});
+    }
+  }
+
+  // ৩. Audio নির্বাচন ব্যবস্থা
+  Future<void> _pickAudio() async {
+    FilePickerResult? result = await FilePicker.platform.pickFiles(
+      type: FileType.audio,
+    );
+
+    if (result != null && result.files.single.path != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Audio Added: ${result.files.single.name}')),
+      );
+    }
+  }
+
+  // ৪. Text যোগ করার ডায়ালগ বক্স
+  void _showTextEditor() {
+    TextEditingController textController = TextEditingController(text: _headlineText);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Edit News Text'),
+        content: TextField(
+          controller: textController,
+          decoration: const InputDecoration(hintText: 'Enter News Headline...'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              setState(() {
+                _headlineText = textController.text;
+              });
+              Navigator.pop(context);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ৫. ভিডিও এক্সপোর্ট সিস্টেম ফিক্স
+  Future<void> _startRendering() async {
     if (_mediaFiles.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please add media first')),
+        const SnackBar(content: Text('Please add media before exporting')),
       );
       return;
     }
 
-    _videoController = VideoPlayerController.file(
-      File(_mediaFiles.first),
-    );
-
-    await _videoController?.initialize();
-    setState(() {
-      _isPlaying = true;
-    });
-
-    if (mounted) {
-      _videoController?.play();
-    }
-  }
-
-  Future<void> _startRendering() async {
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => ExportDialog(
         onExport: (quality) async {
-          // Export logic
+          Navigator.pop(context); // Dialog বন্ধ করা
           _showRenderProgress();
+          
+          // FFmpeg Service প্রসেস স্টার্ট
+          final ffmpegService = FFmpegService();
+          await ffmpegService.generateVideo(
+            inputMedia: _mediaFiles.first,
+            resolution: _selectedResolution,
+            textOverlay: _headlineText,
+            onProgress: (progress) {
+              setState(() {
+                _renderProgress = progress;
+                _renderStatus = 'Processing video...';
+              });
+            },
+          );
         },
       ),
     );
@@ -179,13 +242,23 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // Preview Section
+            // Preview Section (কোড আপডেট করা হয়েছে)
             Container(
               height: 300,
               width: double.infinity,
               color: Colors.black,
-              child: _videoController != null && _videoController!.value.isInitialized
-                  ? VideoPlayer(_videoController!)
+              child: _mediaFiles.isNotEmpty
+                  ? (_isVideo
+                      ? (_videoController != null && _videoController!.value.isInitialized
+                          ? AspectRatio(
+                              aspectRatio: _videoController!.value.aspectRatio,
+                              child: VideoPlayer(_videoController!),
+                            )
+                          : const Center(child: CircularProgressIndicator()))
+                      : Image.file(
+                          File(_mediaFiles.last),
+                          fit: BoxFit.contain,
+                        ))
                   : Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -205,6 +278,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                     ),
             ),
             const SizedBox(height: 16),
+            
             // Quick Tools Grid
             Padding(
               padding: const EdgeInsets.all(16),
@@ -223,7 +297,11 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                   _QuickToolButton(
                     icon: Icons.play_circle,
                     label: 'Preview',
-                    onTap: _playPreview,
+                    onTap: () {
+                      if (_mediaFiles.isNotEmpty) {
+                        _setupPreview(_mediaFiles.last);
+                      }
+                    },
                   ),
                   _QuickToolButton(
                     icon: Icons.monitor,
@@ -238,24 +316,17 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                   _QuickToolButton(
                     icon: Icons.text_fields,
                     label: 'Text',
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Text editor coming soon')),
-                      );
-                    },
+                    onTap: _showTextEditor,
                   ),
                   _QuickToolButton(
                     icon: Icons.music_note,
                     label: 'Audio',
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Audio mixer coming soon')),
-                      );
-                    },
+                    onTap: _pickAudio,
                   ),
                 ],
               ),
             ),
+
             // Project Details
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -291,6 +362,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
               ),
             ),
             const SizedBox(height: 24),
+            
             // Export Button
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -415,8 +487,7 @@ class RenderProgressDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final percentage = (progress * 100).toStringAsFixed(0);
-    final remainingTime =
-        ((1 - progress) * 120).toStringAsFixed(0); // Assuming 2min render
+    final remainingTime = ((1 - progress) * 120).toStringAsFixed(0);
 
     return Dialog(
       backgroundColor: const Color(0xFF1E1E1E),
