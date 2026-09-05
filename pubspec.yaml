@@ -95,41 +95,4 @@ dependency_overrides:
 
 flutter:
   uses-material-design: true
-
-  assets:
-    - assets/
-    - assets/templates/
-    - assets/templates/news_headlines/
-    - assets/templates/festival_cards/
-    - assets/templates/trending_shorts/
-    - assets/icons/
-    - assets/stickers/
-    - assets/fonts/
-    - assets/sample_audio/
-    - assets/sample_videos/
-
-  fonts:
-    - family: Poppins
-      fonts:
-        - asset: assets/fonts/Poppins-Regular.ttf
-        - asset: assets/fonts/Poppins-Bold.ttf
-          weight: 700
-        - asset: assets/fonts/Poppins-SemiBold.ttf
-          weight: 600
-        - asset: assets/fonts/Poppins-Light.ttf
-          weight: 300
-
-    - family: Roboto
-      fonts:
-        - asset: assets/fonts/Roboto-Regular.ttf
-        - asset: assets/fonts/Roboto-Bold.ttf
-          weight: 700
-
-flutter_native_splash:
-  color: "#121212"
-  color_dark: "#121212"
-  image: assets/icons/splash_icon.png
-  branding: assets/icons/branding.png
-  android_12:
-    image: assets/icons/splash_icon_android_12.png
-    color: "#121212"
+  
