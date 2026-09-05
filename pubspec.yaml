@@ -92,6 +92,9 @@ dev_dependencies:
 
 dependency_overrides:
   record_platform_interface: 1.1.0
+  workmanager:
+    git:
+      url: https://github.com/fluttercommunity/flutter_workmanager.git
 
 flutter:
   uses-material-design: true
