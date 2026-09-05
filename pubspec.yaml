@@ -25,7 +25,7 @@ dependencies:
 
   # MEDIA & FILE HANDLING
   image_picker: ^1.0.4
-  file_picker: ^6.0.0
+  file_picker: ^8.1.7
   image: ^4.0.17
   path_provider: ^2.1.2
 
