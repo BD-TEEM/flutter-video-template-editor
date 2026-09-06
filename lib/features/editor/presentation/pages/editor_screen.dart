@@ -1,13 +1,14 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:file_picker/file_picker.dart'; // FilePicker ব্যবহার করা হয়েছে
+import 'package:file_picker/file_picker.dart';
 import 'package:video_player/video_player.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:news_template_maker/core/constants/app_constants.dart';
 import 'package:news_template_maker/core/models/video_project.dart';
-import 'package:news_template_maker/core/theme/app_theme.dart';
 import 'package:news_template_maker/services/ffmpeg_service.dart';
+import 'package:news_template_maker/features/editor/services/bg_removal_service.dart';
+import 'package:news_template_maker/features/editor/presentation/widgets/media_crop_dialog.dart';
 import 'package:news_template_maker/features/editor/presentation/widgets/resolution_selector.dart';
 import 'package:news_template_maker/features/editor/presentation/widgets/template_selector.dart';
 import 'package:news_template_maker/features/editor/presentation/widgets/timeline_editor.dart';
@@ -27,8 +28,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
   late VideoProject _currentProject;
   String _selectedResolution = AppConstants.resolutionFullHD;
   String _selectedTemplate = AppConstants.frameTypeNewsHeadline;
-  List<String> _mediaFiles = [];
-  List<AudioTrack> _audioTracks = [];
+  final List<String> _mediaFiles = [];
   VideoPlayerController? _videoController;
   
   bool _isVideo = false;
@@ -64,7 +64,6 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
     await Permission.storage.request();
   }
 
-  // ১. ছবি ও ভিডিও উভয় পিক করার আপডেট ফাংশন
   Future<void> _pickMedia() async {
     FilePickerResult? result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
@@ -75,25 +74,85 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
       String path = result.files.single.path!;
       setState(() {
         _mediaFiles.add(path);
-        _isVideo = path.endsWith('.mp4') || path.endsWith('.mov') || path.endsWith('.avi');
       });
       _setupPreview(path);
     }
   }
 
-  // ২. প্রিভিউ লোড করার কাস্টম ফাংশন
   Future<void> _setupPreview(String filePath) async {
-    if (_isVideo) {
+    final lower = filePath.toLowerCase();
+    final isVid = lower.endsWith('.mp4') || lower.endsWith('.mov') || lower.endsWith('.avi');
+
+    if (isVid) {
       _videoController?.dispose();
       _videoController = VideoPlayerController.file(File(filePath));
       await _videoController!.initialize();
       _videoController!.play();
       _videoController!.setLooping(true);
-      setState(() {});
+      setState(() {
+        _isVideo = true;
+      });
+    } else {
+      _videoController?.dispose();
+      _videoController = null;
+      setState(() {
+        _isVideo = false;
+      });
     }
   }
 
-  // ৩. Audio নির্বাচন ব্যবস্থা
+  // Crop Action Handler
+  void _openCropDialog(int index, String mediaPath) {
+    showDialog(
+      context: context,
+      builder: (context) => MediaCropDialog(
+        mediaPath: mediaPath,
+        onCropSelected: (x, y, w, h, aspectRatio) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Aspect Ratio Applied (${aspectRatio ?? "Original"})')),
+          );
+        },
+      ),
+    );
+  }
+
+  // Remove BG Action Handler
+  void _removeBackground(int index, String inputPath) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(color: Colors.cyanAccent),
+      ),
+    );
+
+    String outputPath = inputPath.replaceAll('.mp4', '_nobg.mp4');
+    String? result = await BgRemovalService.removeChromaKeyBg(
+      inputPath: inputPath,
+      outputPath: outputPath,
+    );
+
+    if (mounted) Navigator.pop(context); // Progress Dialog বন্ধ
+
+    if (result != null) {
+      setState(() {
+        _mediaFiles[index] = result;
+      });
+      _setupPreview(result);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Background removed successfully!')),
+        );
+      }
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to remove background')),
+        );
+      }
+    }
+  }
+
   Future<void> _pickAudio() async {
     FilePickerResult? result = await FilePicker.platform.pickFiles(
       type: FileType.audio,
@@ -106,37 +165,41 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
     }
   }
 
-  // ৪. Text যোগ করার ডায়ালগ বক্স
   void _showTextEditor() {
     TextEditingController textController = TextEditingController(text: _headlineText);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Edit News Text'),
+        backgroundColor: const Color(0xFF1E1E1E),
+        title: const Text('Edit News Text', style: TextStyle(color: Colors.white)),
         content: TextField(
           controller: textController,
-          decoration: const InputDecoration(hintText: 'Enter News Headline...'),
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(
+            hintText: 'Enter News Headline...',
+            hintStyle: TextStyle(color: Colors.grey),
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: const Text('Cancel', style: TextStyle(color: Colors.redAccent)),
           ),
           ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.cyanAccent),
             onPressed: () {
               setState(() {
                 _headlineText = textController.text;
               });
               Navigator.pop(context);
             },
-            child: const Text('Save'),
+            child: const Text('Save', style: TextStyle(color: Colors.black)),
           ),
         ],
       ),
     );
   }
 
-  // ৫. ভিডিও এক্সপোর্ট সিস্টেম ফিক্স
   Future<void> _startRendering() async {
     if (_mediaFiles.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -150,10 +213,9 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
       barrierDismissible: false,
       builder: (context) => ExportDialog(
         onExport: (quality) async {
-          Navigator.pop(context); // Dialog বন্ধ করা
+          Navigator.pop(context);
           _showRenderProgress();
           
-          // FFmpeg Service প্রসেস স্টার্ট
           final ffmpegService = FFmpegService();
           await ffmpegService.generateVideo(
             inputMedia: _mediaFiles.first,
@@ -222,15 +284,17 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFF121212),
       appBar: AppBar(
-        title: Text(_currentProject.title),
+        backgroundColor: const Color(0xFF1E1E1E),
+        title: Text(_currentProject.title, style: const TextStyle(color: Colors.white)),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.save),
+            icon: const Icon(Icons.save, color: Colors.cyanAccent),
             onPressed: () {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Project saved')),
@@ -242,64 +306,109 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // Preview Section (কোড আপডেট করা হয়েছে)
+            // Preview Screen with Headline Text Overlay
             Container(
-              height: 300,
+              height: 260,
               width: double.infinity,
               color: Colors.black,
-              child: _mediaFiles.isNotEmpty
-                  ? (_isVideo
-                      ? (_videoController != null && _videoController!.value.isInitialized
-                          ? AspectRatio(
-                              aspectRatio: _videoController!.value.aspectRatio,
-                              child: VideoPlayer(_videoController!),
-                            )
-                          : const Center(child: CircularProgressIndicator()))
-                      : Image.file(
-                          File(_mediaFiles.last),
-                          fit: BoxFit.contain,
-                        ))
-                  : Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(
-                            Icons.video_library,
-                            size: 64,
-                            color: Colors.grey,
+              child: Stack(
+                children: [
+                  Center(
+                    child: _mediaFiles.isNotEmpty
+                        ? (_isVideo
+                            ? (_videoController != null && _videoController!.value.isInitialized
+                                ? AspectRatio(
+                                    aspectRatio: _videoController!.value.aspectRatio,
+                                    child: VideoPlayer(_videoController!),
+                                  )
+                                : const CircularProgressIndicator(color: Colors.cyanAccent))
+                            : Image.file(
+                                File(_mediaFiles.last),
+                                fit: BoxFit.contain,
+                              ))
+                        : Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: const [
+                              Icon(Icons.video_library, size: 54, color: Colors.grey),
+                              SizedBox(height: 8),
+                              Text('Preview Screen', style: TextStyle(color: Colors.grey)),
+                            ],
                           ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Preview',
-                            style: Theme.of(context).textTheme.headlineSmall,
+                  ),
+                  if (_headlineText.isNotEmpty)
+                    Positioned(
+                      bottom: 12,
+                      left: 12,
+                      right: 12,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        color: Colors.redAccent.withOpacity(0.85),
+                        child: Text(
+                          _headlineText,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
                           ),
-                        ],
+                        ),
                       ),
                     ),
+                ],
+              ),
             ),
-            const SizedBox(height: 16),
             
+            // Timeline Tracks Section
+            TimelineEditor(
+              mediaFiles: _mediaFiles,
+              onClipSelected: (index) {
+                _setupPreview(_mediaFiles[index]);
+              },
+              onClipRemoved: (index) {
+                setState(() {
+                  _mediaFiles.removeAt(index);
+                  if (_mediaFiles.isNotEmpty) {
+                    _setupPreview(_mediaFiles.last);
+                  } else {
+                    _videoController?.dispose();
+                    _videoController = null;
+                  }
+                });
+              },
+              onCropTap: (index, path) => _openCropDialog(index, path),
+              onRemoveBgTap: (index, path) => _removeBackground(index, path),
+            ),
+
             // Quick Tools Grid
             Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(12),
               child: GridView.count(
                 crossAxisCount: 3,
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                mainAxisSpacing: 12,
-                crossAxisSpacing: 12,
+                mainAxisSpacing: 10,
+                crossAxisSpacing: 10,
                 children: [
                   _QuickToolButton(
-                    icon: Icons.image,
+                    icon: Icons.add_photo_alternate,
                     label: 'Add Media',
                     onTap: _pickMedia,
                   ),
                   _QuickToolButton(
-                    icon: Icons.play_circle,
-                    label: 'Preview',
+                    icon: Icons.crop_rotate,
+                    label: 'Crop / Ratio',
                     onTap: () {
                       if (_mediaFiles.isNotEmpty) {
-                        _setupPreview(_mediaFiles.last);
+                        _openCropDialog(_mediaFiles.length - 1, _mediaFiles.last);
+                      }
+                    },
+                  ),
+                  _QuickToolButton(
+                    icon: Icons.auto_fix_high,
+                    label: 'Remove BG',
+                    onTap: () {
+                      if (_mediaFiles.isNotEmpty) {
+                        _removeBackground(_mediaFiles.length - 1, _mediaFiles.last);
                       }
                     },
                   ),
@@ -315,68 +424,33 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                   ),
                   _QuickToolButton(
                     icon: Icons.text_fields,
-                    label: 'Text',
+                    label: 'Headline',
                     onTap: _showTextEditor,
-                  ),
-                  _QuickToolButton(
-                    icon: Icons.music_note,
-                    label: 'Audio',
-                    onTap: _pickAudio,
                   ),
                 ],
               ),
             ),
 
-            // Project Details
+            // Render & Export Button
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Project Details',
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
-                  const SizedBox(height: 12),
-                  _DetailRow(
-                    label: 'Resolution',
-                    value: _selectedResolution,
-                    onTap: _showResolutionSelector,
-                  ),
-                  _DetailRow(
-                    label: 'Template',
-                    value: _selectedTemplate,
-                    onTap: _showTemplateSelector,
-                  ),
-                  _DetailRow(
-                    label: 'Duration',
-                    value: '${_currentProject.durationInSeconds}s',
-                    onTap: () {},
-                  ),
-                  _DetailRow(
-                    label: 'Media Files',
-                    value: '${_mediaFiles.length} added',
-                    onTap: () {},
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-            
-            // Export Button
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.all(12),
               child: SizedBox(
                 width: double.infinity,
-                height: 56,
+                height: 50,
                 child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.cyanAccent,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
                   onPressed: _startRendering,
-                  icon: const Icon(Icons.download),
-                  label: const Text('Render & Export'),
+                  icon: const Icon(Icons.download, color: Colors.black),
+                  label: const Text(
+                    'Render & Export',
+                    style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
                 ),
               ),
             ),
-            const SizedBox(height: 24),
           ],
         ),
       ),
@@ -402,69 +476,18 @@ class _QuickToolButton extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           color: const Color(0xFF2A2A2A),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(color: Colors.grey.withOpacity(0.2)),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              icon,
-              size: 32,
-              color: Colors.blueAccent,
-            ),
-            const SizedBox(height: 8),
+            Icon(icon, size: 28, color: Colors.cyanAccent),
+            const SizedBox(height: 6),
             Text(
               label,
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _DetailRow extends StatelessWidget {
-  final String label;
-  final String value;
-  final VoidCallback onTap;
-
-  const _DetailRow({
-    required this.label,
-    required this.value,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              label,
-              style: Theme.of(context).textTheme.bodyLarge,
-            ),
-            Row(
-              children: [
-                Text(
-                  value,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.blueAccent,
-                      ),
-                ),
-                const SizedBox(width: 8),
-                const Icon(
-                  Icons.edit,
-                  size: 18,
-                  color: Colors.grey,
-                ),
-              ],
+              style: const TextStyle(color: Colors.white, fontSize: 11),
             ),
           ],
         ),
@@ -479,15 +502,15 @@ class RenderProgressDialog extends StatelessWidget {
   final String status;
 
   const RenderProgressDialog({
+    Key? key,
     required this.projectTitle,
     required this.progress,
     required this.status,
-  });
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     final percentage = (progress * 100).toStringAsFixed(0);
-    final remainingTime = ((1 - progress) * 120).toStringAsFixed(0);
 
     return Dialog(
       backgroundColor: const Color(0xFF1E1E1E),
@@ -497,49 +520,19 @@ class RenderProgressDialog extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
+            const Text(
               'Rendering',
-              style: Theme.of(context).textTheme.headlineSmall,
+              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
-            Text(
-              projectTitle,
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 24),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: LinearProgressIndicator(
-                value: progress,
-                minHeight: 8,
-                backgroundColor: Colors.grey.withOpacity(0.2),
-                valueColor: const AlwaysStoppedAnimation<Color>(
-                  Colors.blueAccent,
-                ),
-              ),
+            LinearProgressIndicator(
+              value: progress,
+              minHeight: 8,
+              backgroundColor: Colors.grey.shade800,
+              valueColor: const AlwaysStoppedAnimation<Color>(Colors.cyanAccent),
             ),
             const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  '$percentage% Complete',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                Text(
-                  '~${remainingTime}s left',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.grey,
-                      ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              status,
-              style: Theme.of(context).textTheme.bodySmall,
-              textAlign: TextAlign.center,
-            ),
+            Text('$percentage% Complete', style: const TextStyle(color: Colors.white)),
           ],
         ),
       ),
