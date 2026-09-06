@@ -23,10 +23,8 @@ class FFmpegService {
 
   FFmpegService._internal();
 
-  final StreamController<double> _progressController =
-      StreamController<double>.broadcast();
-  final StreamController<String> _statusController =
-      StreamController<String>.broadcast();
+  final StreamController<double> _progressController = StreamController<double>.broadcast();
+  final StreamController<String> _statusController = StreamController<String>.broadcast();
 
   Stream<double> get progressStream => _progressController.stream;
   Stream<String> get statusStream => _statusController.stream;
@@ -44,9 +42,21 @@ class FFmpegService {
       final outputPath = '${tempDir.path}/news_export_${uuid.v4()}.mp4';
 
       final isImage = !_isVideo(inputMedia);
+      
+      // Calculate Total Duration for Progress Bar
+      double totalDurationMs = 5000.0; // Default for Images (5 Seconds)
+      if (!isImage) {
+        final mediaInfo = await FFmpegKitConfig.getMediaInformation(inputMedia);
+        final durationStr = mediaInfo.getMediaInformation()?.getDuration();
+        final parsedSec = double.tryParse(durationStr ?? '0') ?? 0.0;
+        if (parsedSec > 0) {
+          totalDurationMs = parsedSec * 1000;
+        }
+      }
+
       List<String> command;
 
-      // Handle Resolution Split (e.g., "1920x1080" or "1080x1920")
+      // Resolution Filter (e.g., "1920x1080" or "1080x1920")
       String resFilter = 'scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2';
       if (resolution.contains('x')) {
         final resParts = resolution.split('x');
@@ -95,7 +105,7 @@ class FFmpegService {
         null,
         (Statistics stats) {
           final timeInMs = stats.getTime();
-          double progress = (timeInMs / 5000.0).clamp(0.0, 1.0);
+          double progress = (timeInMs / totalDurationMs).clamp(0.0, 1.0);
           _progressController.add(progress);
           if (onProgress != null) {
             onProgress(progress);
@@ -108,6 +118,7 @@ class FFmpegService {
 
       if (ReturnCode.isSuccess(returnCode)) {
         _statusController.add('Video exported successfully!');
+        if (onProgress != null) onProgress(1.0);
         logger.i('Exported: $outputPath');
         return outputPath;
       } else {
@@ -119,6 +130,115 @@ class FFmpegService {
     } catch (e) {
       _statusController.add('Error: $e');
       logger.e('Generate Video Error: $e');
+      return null;
+    }
+  }
+
+  /// 1. Automatic Background Removal
+  Future<String?> removeAutoBg({
+    required String inputPath,
+    required String outputPath,
+    Function(double)? onProgress,
+  }) async {
+    try {
+      _statusController.add('Removing background automatically...');
+
+      final mediaInfo = await FFmpegKitConfig.getMediaInformation(inputPath);
+      final durationStr = mediaInfo.getMediaInformation()?.getDuration();
+      double totalDurationMs = (double.tryParse(durationStr ?? '0') ?? 5.0) * 1000;
+
+      final command = [
+        '-i', inputPath,
+        '-vf', 'colorkey=0x00FF00:0.3:0.15,format=yuva420p',
+        '-c:v', 'libx264',
+        '-preset', 'ultrafast',
+        '-pix_fmt', 'yuv420p',
+        '-c:a', 'copy',
+        '-y', outputPath
+      ];
+
+      final session = await FFmpegSession.create(
+        command,
+        null,
+        null,
+        (Statistics stats) {
+          final timeInMs = stats.getTime();
+          double progress = (timeInMs / totalDurationMs).clamp(0.0, 1.0);
+          _progressController.add(progress);
+          if (onProgress != null) onProgress(progress);
+        },
+      );
+
+      await FFmpegKitConfig.asyncFFmpegExecute(session);
+      final returnCode = await session.getReturnCode();
+
+      if (ReturnCode.isSuccess(returnCode)) {
+        _statusController.add('Background removed successfully');
+        if (onProgress != null) onProgress(1.0);
+        return outputPath;
+      } else {
+        _statusController.add('Background removal failed');
+        return null;
+      }
+    } catch (e) {
+      _statusController.add('Error: $e');
+      return null;
+    }
+  }
+
+  /// 2. Advanced Chroma Key Control with Sliders
+  Future<String?> applyChromaKeyWithSliders({
+    required String inputPath,
+    required String outputPath,
+    required double similarity,
+    required double blend,
+    required double brightness,
+    Function(double)? onProgress,
+  }) async {
+    try {
+      _statusController.add('Applying customized Chroma Key...');
+
+      final mediaInfo = await FFmpegKitConfig.getMediaInformation(inputPath);
+      final durationStr = mediaInfo.getMediaInformation()?.getDuration();
+      double totalDurationMs = (double.tryParse(durationStr ?? '0') ?? 5.0) * 1000;
+
+      final filterStr = 'colorkey=0x00FF00:$similarity:$blend,eq=brightness=$brightness';
+
+      final command = [
+        '-i', inputPath,
+        '-vf', filterStr,
+        '-c:v', 'libx264',
+        '-preset', 'ultrafast',
+        '-pix_fmt', 'yuv420p',
+        '-c:a', 'copy',
+        '-y', outputPath
+      ];
+
+      final session = await FFmpegSession.create(
+        command,
+        null,
+        null,
+        (Statistics stats) {
+          final timeInMs = stats.getTime();
+          double progress = (timeInMs / totalDurationMs).clamp(0.0, 1.0);
+          _progressController.add(progress);
+          if (onProgress != null) onProgress(progress);
+        },
+      );
+
+      await FFmpegKitConfig.asyncFFmpegExecute(session);
+      final returnCode = await session.getReturnCode();
+
+      if (ReturnCode.isSuccess(returnCode)) {
+        _statusController.add('Chroma Key applied successfully');
+        if (onProgress != null) onProgress(1.0);
+        return outputPath;
+      } else {
+        _statusController.add('Chroma Key application failed');
+        return null;
+      }
+    } catch (e) {
+      _statusController.add('Error: $e');
       return null;
     }
   }
@@ -137,20 +257,13 @@ class FFmpegService {
       final durationSeconds = durationMs / 1000;
 
       final command = [
-        '-ss',
-        startSeconds.toStringAsFixed(2),
-        '-i',
-        inputPath,
-        '-t',
-        durationSeconds.toStringAsFixed(2),
-        '-c:v',
-        'libx264',
-        '-preset',
-        'fast',
-        '-c:a',
-        'aac',
-        '-y',
-        outputPath,
+        '-ss', startSeconds.toStringAsFixed(2),
+        '-i', inputPath,
+        '-t', durationSeconds.toStringAsFixed(2),
+        '-c:v', 'libx264',
+        '-preset', 'fast',
+        '-c:a', 'aac',
+        '-y', outputPath,
       ];
 
       final session = await FFmpegSession.create(
@@ -240,12 +353,9 @@ class FFmpegService {
       _statusController.add('Adjusting pitch...');
 
       final command = [
-        '-i',
-        inputPath,
-        '-af',
-        'rubberband=pitch=$pitch',
-        '-y',
-        outputPath,
+        '-i', inputPath,
+        '-af', 'rubberband=pitch=$pitch',
+        '-y', outputPath,
       ];
 
       final session = await FFmpegKit.executeWithArguments(command);
@@ -329,45 +439,6 @@ class FFmpegService {
     }
   }
 
-  /// Apply chroma key effect
-  Future<bool> applyChromaKey({
-    required String inputPath,
-    required String outputPath,
-    required int keyColor,
-    double similarity = 50,
-    double blend = 10,
-  }) async {
-    try {
-      _statusController.add('Applying chroma key...');
-
-      final colorHex = '0x${keyColor.toRadixString(16).padLeft(6, '0').toUpperCase()}';
-      final filterComplex = 'chromakey=$colorHex:similarity=${similarity / 100}:blend=${blend / 100}';
-
-      final command = [
-        '-i', inputPath,
-        '-vf', filterComplex,
-        '-c:a', 'copy',
-        '-y', outputPath,
-      ];
-
-      final session = await FFmpegKit.executeWithArguments(command);
-      final returnCode = await session.getReturnCode();
-
-      if (ReturnCode.isSuccess(returnCode)) {
-        _statusController.add('Chroma key applied successfully');
-        logger.i('Chroma key applied: $outputPath');
-        return true;
-      } else {
-        _statusController.add('Chroma key failed');
-        return false;
-      }
-    } catch (e) {
-      _statusController.add('Error: $e');
-      logger.e('Chroma key error: $e');
-      return false;
-    }
-  }
-
   /// Add watermark to video
   Future<bool> addWatermark({
     required String inputPath,
@@ -406,131 +477,6 @@ class FFmpegService {
     } catch (e) {
       _statusController.add('Error: $e');
       logger.e('Watermark error: $e');
-      return false;
-    }
-  }
-
-  /// Add text overlay to video
-  Future<bool> addTextOverlay({
-    required String inputPath,
-    required String outputPath,
-    required String text,
-    int fontSize = 30,
-    int xPos = 50,
-    int yPos = 50,
-    String fontColor = 'FFFFFF',
-  }) async {
-    try {
-      _statusController.add('Adding text overlay...');
-
-      final escapedText = text.replaceAll("'", "\\'").replaceAll(":", "\\:");
-      final filterComplex = "drawtext=text='$escapedText':fontsize=$fontSize:fontcolor=$fontColor:x=$xPos:y=$yPos";
-
-      final command = [
-        '-i', inputPath,
-        '-vf', filterComplex,
-        '-c:a', 'copy',
-        '-y', outputPath,
-      ];
-
-      final session = await FFmpegKit.executeWithArguments(command);
-      final returnCode = await session.getReturnCode();
-
-      if (ReturnCode.isSuccess(returnCode)) {
-        _statusController.add('Text overlay added successfully');
-        logger.i('Text overlay added: $outputPath');
-        return true;
-      } else {
-        _statusController.add('Text overlay failed');
-        return false;
-      }
-    } catch (e) {
-      _statusController.add('Error: $e');
-      logger.e('Text overlay error: $e');
-      return false;
-    }
-  }
-
-  /// Resize video
-  Future<bool> resizeVideo({
-    required String inputPath,
-    required String outputPath,
-    required int width,
-    required int height,
-    String fitMode = 'scale',
-  }) async {
-    try {
-      _statusController.add('Resizing video...');
-
-      String filterComplex;
-      if (fitMode == 'scale') {
-        filterComplex = 'scale=$width:$height';
-      } else if (fitMode == 'pad') {
-        filterComplex = 'scale=$width:$height:force_original_aspect_ratio=decrease,pad=$width:$height:(ow-iw)/2:(oh-ih)/2';
-      } else if (fitMode == 'crop') {
-        filterComplex = 'scale=$width:$height:force_original_aspect_ratio=increase,crop=$width:$height';
-      } else {
-        filterComplex = 'scale=$width:$height';
-      }
-
-      final command = [
-        '-i', inputPath,
-        '-vf', filterComplex,
-        '-c:v', 'libx264',
-        '-c:a', 'aac',
-        '-y', outputPath,
-      ];
-
-      final session = await FFmpegKit.executeWithArguments(command);
-      final returnCode = await session.getReturnCode();
-
-      if (ReturnCode.isSuccess(returnCode)) {
-        _statusController.add('Video resized successfully');
-        logger.i('Video resized: $outputPath');
-        return true;
-      } else {
-        _statusController.add('Resize failed');
-        return false;
-      }
-    } catch (e) {
-      _statusController.add('Error: $e');
-      logger.e('Resize error: $e');
-      return false;
-    }
-  }
-
-  /// Convert image to video format
-  Future<bool> imageToVideo({
-    required String imagePath,
-    required String outputPath,
-    int durationSeconds = 5,
-  }) async {
-    try {
-      _statusController.add('Converting image to video...');
-
-      final command = [
-        '-loop', '1',
-        '-i', imagePath,
-        '-c:v', 'libx264',
-        '-t', durationSeconds.toString(),
-        '-pix_fmt', 'yuv420p',
-        '-y', outputPath,
-      ];
-
-      final session = await FFmpegKit.executeWithArguments(command);
-      final returnCode = await session.getReturnCode();
-
-      if (ReturnCode.isSuccess(returnCode)) {
-        _statusController.add('Image converted to video');
-        logger.i('Image to video: $outputPath');
-        return true;
-      } else {
-        _statusController.add('Conversion failed');
-        return false;
-      }
-    } catch (e) {
-      _statusController.add('Error: $e');
-      logger.e('Image to video error: $e');
       return false;
     }
   }
