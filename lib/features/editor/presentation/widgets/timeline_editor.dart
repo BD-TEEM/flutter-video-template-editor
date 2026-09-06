@@ -44,43 +44,43 @@ class _TimelineEditorState extends State<TimelineEditor> {
 
   @override
   Widget build(BuildContext context) {
+    // ডিলিট করার পর ইনডেক্স ঠিক রাখা
+    if (_selectedClipIndex >= widget.mediaFiles.length && widget.mediaFiles.isNotEmpty) {
+      _selectedClipIndex = widget.mediaFiles.length - 1;
+    }
+
     return Container(
-      height: 200,
+      height: 150, // স্ট্যান্ডার্ড রেসপন্সিভ হাইট
       color: const Color(0xFF121212),
       child: Column(
         children: [
-          // Playhead & Header Section
+          // Timeline Header Section
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             child: Row(
               children: [
-                const Icon(Icons.view_timeline, color: Colors.cyanAccent, size: 20),
+                const Icon(Icons.view_timeline, color: Colors.cyanAccent, size: 18),
                 const SizedBox(width: 8),
-                Text(
+                const Text(
                   'Timeline Tracks',
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
+                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 13),
                 ),
                 const Spacer(),
                 Text(
                   '${widget.mediaFiles.length} item(s)',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Colors.cyanAccent,
-                      ),
+                  style: const TextStyle(color: Colors.cyanAccent, fontSize: 12),
                 ),
               ],
             ),
           ),
-          
-          // Timeline Clips List
+
+          // Timeline Clips List View
           Expanded(
             child: widget.mediaFiles.isEmpty
                 ? Center(
                     child: Text(
                       'No media added to timeline',
-                      style: TextStyle(color: Colors.grey.shade600),
+                      style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
                     ),
                   )
                 : ListView.builder(
@@ -102,92 +102,119 @@ class _TimelineEditorState extends State<TimelineEditor> {
                         },
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
-                          width: 130,
-                          margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                          width: 100,
+                          margin: const EdgeInsets.symmetric(horizontal: 5, vertical: 4),
                           decoration: BoxDecoration(
                             color: const Color(0xFF2A2A2A),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                              color: isSelected ? Colors.cyanAccent : Colors.grey.withOpacity(0.2),
+                              color: isSelected ? Colors.cyanAccent : Colors.grey.withOpacity(0.3),
                               width: isSelected ? 2 : 1,
                             ),
                           ),
                           child: Stack(
                             children: [
-                              Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    isVideoFile ? Icons.video_camera_back : Icons.image,
-                                    color: isSelected ? Colors.cyanAccent : Colors.grey,
-                                    size: 28,
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                                    child: Text(
-                                      isVideoFile ? 'Video ${index + 1}' : 'Image ${index + 1}',
-                                      style: const TextStyle(color: Colors.white, fontSize: 11),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                  
-                                  // Selected Clip Action Buttons (Crop & Remove BG)
-                                  if (isSelected) ...[
-                                    const SizedBox(height: 6),
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        // Crop Button
-                                        InkWell(
-                                          onTap: () {
-                                            if (widget.onCropTap != null) {
-                                              widget.onCropTap!(index, filePath);
-                                            }
-                                          },
-                                          child: Container(
-                                            padding: const EdgeInsets.all(4),
-                                            decoration: BoxDecoration(
-                                              color: Colors.black45,
-                                              borderRadius: BorderRadius.circular(4),
-                                            ),
-                                            child: const Icon(Icons.crop, size: 14, color: Colors.white),
+                              // 1. Image Preview Background / Video Icon
+                              Positioned.fill(
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(6),
+                                  child: isVideoFile
+                                      ? Container(
+                                          color: Colors.black45,
+                                          child: const Center(
+                                            child: Icon(Icons.play_circle_fill, color: Colors.cyanAccent, size: 28),
                                           ),
+                                        )
+                                      : Image.file(
+                                          File(filePath),
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) => const Icon(Icons.broken_image, color: Colors.grey),
                                         ),
-                                        const SizedBox(width: 8),
-                                        // Remove BG Button
-                                        InkWell(
-                                          onTap: () {
-                                            if (widget.onRemoveBgTap != null) {
-                                              widget.onRemoveBgTap!(index, filePath);
-                                            }
-                                          },
-                                          child: Container(
-                                            padding: const EdgeInsets.all(4),
-                                            decoration: BoxDecoration(
-                                              color: Colors.black45,
-                                              borderRadius: BorderRadius.circular(4),
-                                            ),
-                                            child: const Icon(Icons.auto_fix_high, size: 14, color: Colors.cyanAccent),
-                                          ),
-                                        ),
+                                ),
+                              ),
+
+                              // Gradient Layer for Overlaying Text
+                              Positioned.fill(
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(6),
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topCenter,
+                                      end: Alignment.bottomCenter,
+                                      colors: [
+                                        Colors.black38,
+                                        Colors.transparent,
+                                        Colors.black.withOpacity(0.8),
                                       ],
                                     ),
-                                  ]
-                                ],
+                                  ),
+                                ),
                               ),
-                              
-                              // Delete Clip Cross Icon
+
+                              // 2. Action Controls bottom layer
+                              Positioned(
+                                bottom: 4,
+                                left: 0,
+                                right: 0,
+                                child: Column(
+                                  children: [
+                                    Text(
+                                      isVideoFile ? 'Vid ${index + 1}' : 'Img ${index + 1}',
+                                      style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                    ),
+                                    if (isSelected) ...[
+                                      const SizedBox(height: 2),
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          InkWell(
+                                            onTap: () => widget.onCropTap?.call(index, filePath),
+                                            child: Container(
+                                              padding: const EdgeInsets.all(3),
+                                              decoration: BoxDecoration(
+                                                color: Colors.black87,
+                                                borderRadius: BorderRadius.circular(4),
+                                              ),
+                                              child: const Icon(Icons.crop, size: 12, color: Colors.white),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          InkWell(
+                                            onTap: () => widget.onRemoveBgTap?.call(index, filePath),
+                                            child: Container(
+                                              padding: const EdgeInsets.all(3),
+                                              decoration: BoxDecoration(
+                                                color: Colors.black87,
+                                                borderRadius: BorderRadius.circular(4),
+                                              ),
+                                              child: const Icon(Icons.auto_fix_high, size: 12, color: Colors.cyanAccent),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+
+                              // 3. Remove Cross Icon Top-Right
                               if (widget.onClipRemoved != null)
                                 Positioned(
-                                  top: 4,
-                                  right: 4,
+                                  top: 3,
+                                  right: 3,
                                   child: GestureDetector(
                                     onTap: () => widget.onClipRemoved!(index),
-                                    child: const Icon(
-                                      Icons.cancel,
-                                      size: 18,
-                                      color: Colors.redAccent,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(2),
+                                      decoration: const BoxDecoration(
+                                        color: Colors.black87,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.close,
+                                        size: 14,
+                                        color: Colors.redAccent,
+                                      ),
                                     ),
                                   ),
                                 ),
