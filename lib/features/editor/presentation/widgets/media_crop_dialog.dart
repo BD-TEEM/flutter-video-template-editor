@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 
 class MediaCropDialog extends StatefulWidget {
@@ -15,99 +16,116 @@ class MediaCropDialog extends StatefulWidget {
 }
 
 class _MediaCropDialogState extends State<MediaCropDialog> {
-  // null = Original ratio (কোনো রেশিও চেঞ্জ হবে না)
-  double? _selectedAspectRatio; 
-  String _selectedLabel = 'Original';
+  double? _selectedAspectRatio = 16 / 9; // Default aspect ratio
+  String _activeRatioName = '16:9';
 
-  final List<Map<String, dynamic>> _ratioOptions = [
-    {'label': 'Original', 'ratio': null, 'icon': Icons.aspect_ratio},
-    {'label': '16:9', 'ratio': 16 / 9, 'icon': Icons.tv},
-    {'label': '9:16', 'ratio': 9 / 16, 'icon': Icons.stay_current_portrait},
-    {'label': '1:1', 'ratio': 1 / 1, 'icon': Icons.crop_square},
-    {'label': '4:5', 'ratio': 4 / 5, 'icon': Icons.crop_portrait},
-    {'label': '3:4', 'ratio': 3 / 4, 'icon': Icons.crop_3_2},
-  ];
+  final Map<String, double?> _ratios = {
+    'Free': null,
+    '16:9': 16 / 9,
+    '9:16': 9 / 16,
+    '1:1': 1.0,
+    '4:3': 4 / 3,
+  };
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
+    return Dialog(
       backgroundColor: const Color(0xFF1E1E1E),
-      title: const Text('Select Aspect Ratio', style: TextStyle(color: Colors.white, fontSize: 18)),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Dynamic Preview Window
-          AspectRatio(
-            aspectRatio: _selectedAspectRatio ?? (16 / 9), // Original-এর জন্য ডিফল্ট ১৬:৯ প্রিভিউ দেখাবে
-            child: Container(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Crop & Aspect Ratio',
+              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+
+            // Dynamic Aspect Ratio Preview Frame
+            Container(
+              height: 200,
+              width: double.infinity,
               decoration: BoxDecoration(
                 color: Colors.black,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.cyanAccent, width: 1.5),
+                border: Border.all(color: Colors.cyanAccent, width: 1),
               ),
               child: Center(
-                child: Text(
-                  'Preview Area\n$_selectedLabel',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.white70, fontSize: 13),
+                child: AspectRatio(
+                  aspectRatio: _selectedAspectRatio ?? (16 / 9),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: Image.file(
+                      File(widget.mediaPath),
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => const Icon(
+                        Icons.video_file,
+                        size: 48,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
-          ),
-          const SizedBox(height: 16),
-          
-          // Ratio Selection Buttons
-          Wrap(
-            spacing: 8.0,
-            runSpacing: 8.0,
-            alignment: WrapAlignment.center,
-            children: _ratioOptions.map((option) {
-              final isSelected = _selectedAspectRatio == option['ratio'];
-              return ChoiceChip(
-                avatar: Icon(
-                  option['icon'] as IconData,
-                  size: 16,
-                  color: isSelected ? Colors.black : Colors.white,
+            const SizedBox(height: 16),
+
+            // Aspect Ratio Selector Buttons
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: _ratios.entries.map((entry) {
+                  final isSelected = _activeRatioName == entry.key;
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: ChoiceChip(
+                      label: Text(entry.key),
+                      selected: isSelected,
+                      selectedColor: Colors.cyanAccent,
+                      labelStyle: TextStyle(
+                        color: isSelected ? Colors.black : Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      onSelected: (val) {
+                        if (val) {
+                          setState(() {
+                            _activeRatioName = entry.key;
+                            _selectedAspectRatio = entry.value;
+                          });
+                        }
+                      },
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Action Buttons
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel', style: TextStyle(color: Colors.redAccent)),
                 ),
-                label: Text(
-                  option['label'] as String,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: isSelected ? Colors.black : Colors.white,
-                  ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.cyanAccent),
+                  onPressed: () {
+                    // Pass crop metrics & ratio back to EditorScreen
+                    widget.onCropSelected(0, 0, 100, 100, _selectedAspectRatio);
+                    Navigator.pop(context);
+                  },
+                  child: const Text('Apply Crop', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
                 ),
-                selected: isSelected,
-                selectedColor: Colors.cyanAccent,
-                backgroundColor: const Color(0xFF2C2C2C),
-                onSelected: (bool selected) {
-                  if (selected) {
-                    setState(() {
-                      _selectedAspectRatio = option['ratio'] as double?;
-                      _selectedLabel = option['label'] as String;
-                    });
-                  }
-                },
-              );
-            }).toList(),
-          ),
-        ],
+              ],
+            ),
+          ],
+        ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel', style: TextStyle(color: Colors.redAccent)),
-        ),
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(backgroundColor: Colors.cyanAccent),
-          onPressed: () {
-            // Selected Ratio and Crop Dimensions passing
-            widget.onCropSelected(0, 0, 1, 1, _selectedAspectRatio);
-            Navigator.pop(context);
-          },
-          child: const Text('Apply', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-        ),
-      ],
     );
   }
 }
