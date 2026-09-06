@@ -30,9 +30,19 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
   String _selectedTemplate = AppConstants.frameTypeNewsHeadline;
   final List<String> _mediaFiles = [];
   VideoPlayerController? _videoController;
-  
+
   bool _isVideo = false;
   String _headlineText = "";
+  Color _textColor = Colors.white;
+  Color _textBgColor = Colors.redAccent;
+  double _fontSize = 16.0;
+
+  // Position for draggable headline
+  Offset _textPosition = const Offset(20, 180);
+
+  // Selected Aspect Ratio for preview
+  double? _selectedAspectRatio;
+
   double _renderProgress = 0.0;
   String _renderStatus = '';
 
@@ -83,33 +93,42 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
     final lower = filePath.toLowerCase();
     final isVid = lower.endsWith('.mp4') || lower.endsWith('.mov') || lower.endsWith('.avi');
 
+    if (_videoController != null) {
+      await _videoController!.dispose();
+      _videoController = null;
+    }
+
     if (isVid) {
-      _videoController?.dispose();
       _videoController = VideoPlayerController.file(File(filePath));
       await _videoController!.initialize();
       _videoController!.play();
       _videoController!.setLooping(true);
-      setState(() {
-        _isVideo = true;
-      });
+      if (mounted) {
+        setState(() {
+          _isVideo = true;
+        });
+      }
     } else {
-      _videoController?.dispose();
-      _videoController = null;
-      setState(() {
-        _isVideo = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isVideo = false;
+        });
+      }
     }
   }
 
-  // Crop Action Handler
+  // Crop Action Handler with dynamic aspect ratio update
   void _openCropDialog(int index, String mediaPath) {
     showDialog(
       context: context,
       builder: (context) => MediaCropDialog(
         mediaPath: mediaPath,
         onCropSelected: (x, y, w, h, aspectRatio) {
+          setState(() {
+            _selectedAspectRatio = aspectRatio;
+          });
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Aspect Ratio Applied (${aspectRatio ?? "Original"})')),
+            SnackBar(content: Text('Aspect Ratio Applied: ${aspectRatio != null ? aspectRatio.toStringAsFixed(2) : "Original"}')),
           );
         },
       ),
@@ -126,19 +145,19 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
       ),
     );
 
-    String outputPath = inputPath.replaceAll('.mp4', '_nobg.mp4');
+    String outputPath = inputPath.replaceAll(RegExp(r'\.(mp4|mov|avi|jpg|png|jpeg)$'), '_nobg.mp4');
     String? result = await BgRemovalService.removeChromaKeyBg(
       inputPath: inputPath,
       outputPath: outputPath,
     );
 
-    if (mounted) Navigator.pop(context); // Progress Dialog বন্ধ
+    if (mounted) Navigator.pop(context);
 
     if (result != null) {
       setState(() {
         _mediaFiles[index] = result;
       });
-      _setupPreview(result);
+      await _setupPreview(result);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Background removed successfully!')),
@@ -153,49 +172,66 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
     }
   }
 
-  Future<void> _pickAudio() async {
-    FilePickerResult? result = await FilePicker.platform.pickFiles(
-      type: FileType.audio,
-    );
-
-    if (result != null && result.files.single.path != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Audio Added: ${result.files.single.name}')),
-      );
-    }
-  }
-
   void _showTextEditor() {
     TextEditingController textController = TextEditingController(text: _headlineText);
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1E1E1E),
-        title: const Text('Edit News Text', style: TextStyle(color: Colors.white)),
-        content: TextField(
-          controller: textController,
-          style: const TextStyle(color: Colors.white),
-          decoration: const InputDecoration(
-            hintText: 'Enter News Headline...',
-            hintStyle: TextStyle(color: Colors.grey),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel', style: TextStyle(color: Colors.redAccent)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.cyanAccent),
-            onPressed: () {
-              setState(() {
-                _headlineText = textController.text;
-              });
-              Navigator.pop(context);
-            },
-            child: const Text('Save', style: TextStyle(color: Colors.black)),
-          ),
-        ],
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            backgroundColor: const Color(0xFF1E1E1E),
+            title: const Text('Edit News Headline', style: TextStyle(color: Colors.white)),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: textController,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: const InputDecoration(
+                      hintText: 'Enter News Headline...',
+                      hintStyle: TextStyle(color: Colors.grey),
+                      enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.cyanAccent)),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Font Size:', style: TextStyle(color: Colors.white)),
+                      Slider(
+                        value: _fontSize,
+                        min: 10,
+                        max: 32,
+                        activeColor: Colors.cyanAccent,
+                        onChanged: (val) {
+                          setDialogState(() => _fontSize = val);
+                          setState(() {});
+                        },
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel', style: TextStyle(color: Colors.redAccent)),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.cyanAccent),
+                onPressed: () {
+                  setState(() {
+                    _headlineText = textController.text;
+                  });
+                  Navigator.pop(context);
+                },
+                child: const Text('Save', style: TextStyle(color: Colors.black)),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -215,17 +251,19 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
         onExport: (quality) async {
           Navigator.pop(context);
           _showRenderProgress();
-          
+
           final ffmpegService = FFmpegService();
           await ffmpegService.generateVideo(
             inputMedia: _mediaFiles.first,
             resolution: _selectedResolution,
             textOverlay: _headlineText,
             onProgress: (progress) {
-              setState(() {
-                _renderProgress = progress;
-                _renderStatus = 'Processing video...';
-              });
+              if (mounted) {
+                setState(() {
+                  _renderProgress = progress;
+                  _renderStatus = 'Processing video... (${(progress * 100).toInt()}%)';
+                });
+              }
             },
           );
         },
@@ -297,7 +335,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
             icon: const Icon(Icons.save, color: Colors.cyanAccent),
             onPressed: () {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Project saved')),
+                const SnackBar(content: Text('Project saved successfully')),
               );
             },
           ),
@@ -306,50 +344,64 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // Preview Screen with Headline Text Overlay
+            // Dynamic Interactive Preview Screen Frame
             Container(
-              height: 260,
+              height: 280,
               width: double.infinity,
               color: Colors.black,
               child: Stack(
                 children: [
                   Center(
                     child: _mediaFiles.isNotEmpty
-                        ? (_isVideo
-                            ? (_videoController != null && _videoController!.value.isInitialized
-                                ? AspectRatio(
-                                    aspectRatio: _videoController!.value.aspectRatio,
-                                    child: VideoPlayer(_videoController!),
-                                  )
-                                : const CircularProgressIndicator(color: Colors.cyanAccent))
-                            : Image.file(
-                                File(_mediaFiles.last),
-                                fit: BoxFit.contain,
-                              ))
+                        ? AspectRatio(
+                            aspectRatio: _selectedAspectRatio ??
+                                (_isVideo && _videoController != null && _videoController!.value.isInitialized
+                                    ? _videoController!.value.aspectRatio
+                                    : 16 / 9),
+                            child: _isVideo
+                                ? (_videoController != null && _videoController!.value.isInitialized
+                                    ? VideoPlayer(_videoController!)
+                                    : const Center(child: CircularProgressIndicator(color: Colors.cyanAccent)))
+                                : Image.file(
+                                    File(_mediaFiles.last),
+                                    fit: BoxFit.contain,
+                                  ),
+                          )
                         : Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: const [
                               Icon(Icons.video_library, size: 54, color: Colors.grey),
                               SizedBox(height: 8),
-                              Text('Preview Screen', style: TextStyle(color: Colors.grey)),
+                              Text('Select Media to Preview', style: TextStyle(color: Colors.grey)),
                             ],
                           ),
                   ),
+
+                  // Draggable & Customizable Headline Overlay Text
                   if (_headlineText.isNotEmpty)
                     Positioned(
-                      bottom: 12,
-                      left: 12,
-                      right: 12,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        color: Colors.redAccent.withOpacity(0.85),
-                        child: Text(
-                          _headlineText,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
+                      left: _textPosition.dx,
+                      top: _textPosition.dy,
+                      child: GestureDetector(
+                        onPanUpdate: (details) {
+                          setState(() {
+                            _textPosition += details.delta;
+                          });
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: _textBgColor.withOpacity(0.85),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: Colors.white, width: 1),
+                          ),
+                          child: Text(
+                            _headlineText,
+                            style: TextStyle(
+                              color: _textColor,
+                              fontWeight: FontWeight.bold,
+                              fontSize: _fontSize,
+                            ),
                           ),
                         ),
                       ),
@@ -357,8 +409,8 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                 ],
               ),
             ),
-            
-            // Timeline Tracks Section
+
+            // Timeline Tracks Component
             TimelineEditor(
               mediaFiles: _mediaFiles,
               onClipSelected: (index) {
@@ -379,7 +431,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
               onRemoveBgTap: (index, path) => _removeBackground(index, path),
             ),
 
-            // Quick Tools Grid
+            // Quick Tools Grid Controls
             Padding(
               padding: const EdgeInsets.all(12),
               child: GridView.count(
@@ -400,6 +452,10 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                     onTap: () {
                       if (_mediaFiles.isNotEmpty) {
                         _openCropDialog(_mediaFiles.length - 1, _mediaFiles.last);
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Please add media first')),
+                        );
                       }
                     },
                   ),
@@ -409,6 +465,10 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
                     onTap: () {
                       if (_mediaFiles.isNotEmpty) {
                         _removeBackground(_mediaFiles.length - 1, _mediaFiles.last);
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Please add media first')),
+                        );
                       }
                     },
                   ),
@@ -431,7 +491,7 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
               ),
             ),
 
-            // Render & Export Button
+            // Export Button Container
             Padding(
               padding: const EdgeInsets.all(12),
               child: SizedBox(
@@ -521,18 +581,20 @@ class RenderProgressDialog extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text(
-              'Rendering',
+              'Rendering Video',
               style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
             LinearProgressIndicator(
-              value: progress,
+              value: progress > 0 ? progress : null,
               minHeight: 8,
               backgroundColor: Colors.grey.shade800,
               valueColor: const AlwaysStoppedAnimation<Color>(Colors.cyanAccent),
             ),
             const SizedBox(height: 16),
             Text('$percentage% Complete', style: const TextStyle(color: Colors.white)),
+            const SizedBox(height: 8),
+            Text(status, style: const TextStyle(color: Colors.grey, fontSize: 12)),
           ],
         ),
       ),
