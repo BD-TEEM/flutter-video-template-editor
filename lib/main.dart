@@ -4,6 +4,8 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:news_template_maker/core/theme/app_theme.dart';
 import 'package:news_template_maker/core/constants/app_constants.dart';
 import 'package:news_template_maker/features/editor/presentation/pages/editor_screen.dart';
+// ১. নতুন তৈরি করা গ্যালারি স্ক্রিন ইমপোর্ট করা হলো
+import 'package:news_template_maker/features/home/presentation/pages/multi_format_gallery_screen.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 Future<void> requestPermissions() async {
@@ -36,7 +38,7 @@ void main() async {
 }
 
 class MyApp extends ConsumerWidget {
-  const MyApp({Key? key}) : super(Key? key);
+  const MyApp({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -52,7 +54,7 @@ class MyApp extends ConsumerWidget {
 }
 
 class MainNavigation extends ConsumerStatefulWidget {
-  const MainNavigation({Key? key}) : super(Key? key);
+  const MainNavigation({Key? key}) : super(key: key);
 
   @override
   ConsumerState<MainNavigation> createState() => _MainNavigationState();
@@ -126,18 +128,14 @@ class _MainNavigationState extends ConsumerState<MainNavigation> {
   }
 }
 
-// ==========================================
-// ১. আপডেট করা হোম স্ক্রিন (ফোল্ডার ভিউ)
-// ==========================================
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({Key? key}) : super(Key? key);
+  const HomeScreen({Key? key}) : super(key: key);
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  // ক্যাটাগরিগুলোকে এখন আলাদা ফোল্ডার আকারে সাজানো হলো
   final List<Map<String, dynamic>> _folders = [
     {
       'id': 'breaking',
@@ -292,10 +290,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 final folder = _folders[index];
                 return GestureDetector(
                   onTap: () {
-                    // ফোল্ডারে ক্লিক করলে ফোল্ডারের পেজ খুলবে
+                    // ২. আপডেট: ফোল্ডারে ক্লিক করলে নতুন MultiFormatGalleryScreen ওপেন হবে
                     Navigator.of(context).push(
                       MaterialPageRoute(
-                        builder: (_) => CategoryTemplatesScreen(
+                        builder: (_) => MultiFormatGalleryScreen(
                           categoryName: folder['name'],
                         ),
                       ),
@@ -361,111 +359,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-// ==========================================
-// ২. ফোল্ডারের ভেতরের টেমপ্লেট দেখানোর স্ক্রিন
-// ==========================================
-class CategoryTemplatesScreen extends StatelessWidget {
-  final String categoryName;
-
-  const CategoryTemplatesScreen({Key? key, required this.categoryName})
-      : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    final List<Map<String, dynamic>> templates = [
-      {
-        'title': '$categoryName Main Layout',
-        'tag': 'Hot',
-        'color': Colors.redAccent,
-        'icon': Icons.movie_creation_outlined,
-      },
-      {
-        'title': '$categoryName Ticker Frame',
-        'tag': 'New',
-        'color': Colors.cyanAccent,
-        'icon': Icons.slideshow,
-      },
-      {
-        'title': '$categoryName Studio Style',
-        'tag': 'Pro',
-        'color': Colors.purpleAccent,
-        'icon': Icons.video_label,
-      },
-    ];
-
-    return Scaffold(
-      backgroundColor: const Color(0xFF121212),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF1E1E1E),
-        title: Text(categoryName),
-      ),
-      body: GridView.builder(
-        padding: const EdgeInsets.all(16),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
-          childAspectRatio: 0.85,
-        ),
-        itemCount: templates.length,
-        itemBuilder: (context, index) {
-          final template = templates[index];
-          return GestureDetector(
-            onTap: () {
-              // মূল অরিজিনাল টেমপ্লেটে ক্লিক করলে Editor Screen ওপেন হবে
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const EditorScreen()),
-              );
-            },
-            child: Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E1E1E),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white12),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: (template['color'] as Color).withOpacity(0.15),
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(12),
-                        ),
-                      ),
-                      child: Center(
-                        child: Icon(
-                          template['icon'] as IconData,
-                          size: 48,
-                          color: template['color'] as Color,
-                        ),
-                      ),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(10),
-                    child: Text(
-                      template['title'],
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
       ),
     );
   }
