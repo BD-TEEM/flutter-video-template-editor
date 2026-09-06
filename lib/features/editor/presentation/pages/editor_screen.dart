@@ -128,27 +128,135 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
             _selectedAspectRatio = aspectRatio;
           });
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Aspect Ratio Applied: ${aspectRatio != null ? aspectRatio.toStringAsFixed(2) : "Original"}')),
+            SnackBar(
+              content: Text('Aspect Ratio Applied: ${aspectRatio != null ? aspectRatio.toStringAsFixed(2) : "Original"}'),
+            ),
           );
         },
       ),
     );
   }
 
-  // Remove BG Action Handler
-  void _removeBackground(int index, String inputPath) async {
+  // Remove BG Main Options Popup
+  void _removeBackground(int index, String inputPath) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1E1E1E),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Select Background Removal Method',
+                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 20),
+
+              // Option 1: Auto BG Removal
+              ListTile(
+                leading: const Icon(Icons.auto_fix_high, color: Colors.cyanAccent),
+                title: const Text('Auto BG Removal', style: TextStyle(color: Colors.white)),
+                subtitle: const Text('Removes image/video background automatically', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                tileColor: const Color(0xFF2A2A2A),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _processAutoBgRemoval(index, inputPath);
+                },
+              ),
+
+              const SizedBox(height: 12),
+
+              // Option 2: Chroma Key Sliders Control
+              ListTile(
+                leading: const Icon(Icons.tune, color: Colors.greenAccent),
+                title: const Text('Chroma Key (Green Screen)', style: TextStyle(color: Colors.white)),
+                subtitle: const Text('Adjust green screen edge, blend & brightness manually', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                tileColor: const Color(0xFF2A2A2A),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _openChromaKeySliderDialog(index, inputPath);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // 1. Auto BG Removal Process with Corner Progress HUD
+  void _processAutoBgRemoval(int index, String inputPath) async {
+    double bgProgress = 0.0;
+    bool isPreparing = true;
+
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(
-        child: CircularProgressIndicator(color: Colors.cyanAccent),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return Stack(
+            children: [
+              Positioned(
+                bottom: 20,
+                right: 20,
+                child: Material(
+                  color: Colors.transparent,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1E1E1E).withOpacity(0.95),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.cyanAccent, width: 1),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.cyanAccent),
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          isPreparing
+                              ? "Preparing media..."
+                              : "Removing BG: ${(bgProgress * 100).toStringAsFixed(0)}%",
+                          style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
 
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) isPreparing = false;
+    });
+
     String outputPath = inputPath.replaceAll(RegExp(r'\.(mp4|mov|avi|jpg|png|jpeg)$'), '_nobg.mp4');
-    String? result = await BgRemovalService.removeChromaKeyBg(
+
+    String? result = await BgRemovalService.removeAutoBg(
       inputPath: inputPath,
       outputPath: outputPath,
+      onProgress: (progress) {
+        if (mounted) {
+          setState(() {
+            bgProgress = progress;
+          });
+        }
+      },
     );
 
     if (mounted) Navigator.pop(context);
@@ -170,6 +278,113 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
         );
       }
     }
+  }
+
+  // 2. Manual Chroma Key Fine Tuning BottomSheet Dialog
+  void _openChromaKeySliderDialog(int index, String inputPath) {
+    double similarity = 0.3;
+    double blend = 0.15;
+    double brightness = 0.0;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1E1E1E),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Chroma Key Fine Tuning',
+                    style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Slider 1: Green Intensity Cut
+                  Text('Green Cut Intensity: ${similarity.toStringAsFixed(2)}', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                  Slider(
+                    value: similarity,
+                    min: 0.1,
+                    max: 0.7,
+                    activeColor: Colors.greenAccent,
+                    onChanged: (val) => setModalState(() => similarity = val),
+                  ),
+
+                  // Slider 2: Edge Smooth & Blend
+                  Text('Edge Smooth & Blend: ${blend.toStringAsFixed(2)}', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                  Slider(
+                    value: blend,
+                    min: 0.0,
+                    max: 0.5,
+                    activeColor: Colors.cyanAccent,
+                    onChanged: (val) => setModalState(() => blend = val),
+                  ),
+
+                  // Slider 3: Brightness / Color Match
+                  Text('Subject Brightness: ${brightness.toStringAsFixed(2)}', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                  Slider(
+                    value: brightness,
+                    min: -0.5,
+                    max: 0.5,
+                    activeColor: Colors.orangeAccent,
+                    onChanged: (val) => setModalState(() => brightness = val),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.cyanAccent),
+                      onPressed: () async {
+                        Navigator.pop(context);
+
+                        String outputPath = inputPath.replaceAll(RegExp(r'\.(mp4|mov|avi|jpg|png|jpeg)$'), '_chroma.mp4');
+
+                        String? result = await BgRemovalService.applyChromaKeyWithSliders(
+                          inputPath: inputPath,
+                          outputPath: outputPath,
+                          similarity: similarity,
+                          blend: blend,
+                          brightness: brightness,
+                        );
+
+                        if (result != null) {
+                          setState(() {
+                            _mediaFiles[index] = result;
+                          });
+                          await _setupPreview(result);
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Chroma Key applied successfully!')),
+                            );
+                          }
+                        } else {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Failed to apply Chroma Key')),
+                            );
+                          }
+                        }
+                      },
+                      child: const Text('Apply Chroma Key', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   void _showTextEditor() {
@@ -580,21 +795,34 @@ class RenderProgressDialog extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
-              'Rendering Video',
-              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            Text(
+              projectTitle,
+              style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
             LinearProgressIndicator(
               value: progress > 0 ? progress : null,
               minHeight: 8,
               backgroundColor: Colors.grey.shade800,
-              valueColor: const AlwaysStoppedAnimation<Color>(Colors.cyanAccent),
+              color: Colors.cyanAccent,
             ),
-            const SizedBox(height: 16),
-            Text('$percentage% Complete', style: const TextStyle(color: Colors.white)),
-            const SizedBox(height: 8),
-            Text(status, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    status.isEmpty ? 'Processing...' : status,
+                    style: const TextStyle(color: Colors.grey, fontSize: 12),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Text(
+                  '$percentage%',
+                  style: const TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
           ],
         ),
       ),
