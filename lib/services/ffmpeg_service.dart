@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ffmpeg_kit_flutter_new/ffmpeg_kit.dart';
@@ -30,6 +31,98 @@ class FFmpegService {
   Stream<double> get progressStream => _progressController.stream;
   Stream<String> get statusStream => _statusController.stream;
 
+  /// Main Generation Function for News Editor Screen
+  Future<String?> generateVideo({
+    required String inputMedia,
+    required String resolution,
+    required String textOverlay,
+    Function(double)? onProgress,
+  }) async {
+    try {
+      _statusController.add('Preparing video processing...');
+      final tempDir = await getTemporaryDirectory();
+      final outputPath = '${tempDir.path}/news_export_${uuid.v4()}.mp4';
+
+      final isImage = !_isVideo(inputMedia);
+      List<String> command;
+
+      // Handle Resolution Split (e.g., "1920x1080" or "1080x1920")
+      String resFilter = 'scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2';
+      if (resolution.contains('x')) {
+        final resParts = resolution.split('x');
+        if (resParts.length == 2) {
+          final w = resParts[0];
+          final h = resParts[1];
+          resFilter = 'scale=$w:$h:force_original_aspect_ratio=decrease,pad=$w:$h:(ow-iw)/2:(oh-ih)/2';
+        }
+      }
+
+      // Handle Text Overlay Filter
+      String videoFilter = resFilter;
+      if (textOverlay.isNotEmpty) {
+        final escapedText = textOverlay.replaceAll("'", "\\'").replaceAll(":", "\\:");
+        videoFilter += ",drawtext=text='$escapedText':fontsize=36:fontcolor=white:box=1:boxcolor=red@0.8:boxborderw=10:x=(w-tw)/2:y=h-th-40";
+      }
+
+      if (isImage) {
+        // Image to 5-second News Video
+        command = [
+          '-loop', '1',
+          '-i', inputMedia,
+          '-vf', videoFilter,
+          '-c:v', 'libx264',
+          '-t', '5',
+          '-pix_fmt', 'yuv420p',
+          '-y',
+          outputPath
+        ];
+      } else {
+        // Video Processing
+        command = [
+          '-i', inputMedia,
+          '-vf', videoFilter,
+          '-c:v', 'libx264',
+          '-preset', 'fast',
+          '-c:a', 'aac',
+          '-y',
+          outputPath
+        ];
+      }
+
+      final session = await FFmpegSession.create(
+        command,
+        null,
+        null,
+        (Statistics stats) {
+          final timeInMs = stats.getTime();
+          double progress = (timeInMs / 5000.0).clamp(0.0, 1.0);
+          _progressController.add(progress);
+          if (onProgress != null) {
+            onProgress(progress);
+          }
+        },
+      );
+
+      await FFmpegKitConfig.asyncFFmpegExecute(session);
+      final returnCode = await session.getReturnCode();
+
+      if (ReturnCode.isSuccess(returnCode)) {
+        _statusController.add('Video exported successfully!');
+        logger.i('Exported: $outputPath');
+        return outputPath;
+      } else {
+        _statusController.add('Export failed');
+        final logs = await session.getLogsAsString();
+        logger.e('FFmpeg Fail Log: $logs');
+        return null;
+      }
+    } catch (e) {
+      _statusController.add('Error: $e');
+      logger.e('Generate Video Error: $e');
+      return null;
+    }
+  }
+
   /// Trim video clip
   Future<bool> trimVideo({
     required String inputPath,
@@ -44,10 +137,10 @@ class FFmpegService {
       final durationSeconds = durationMs / 1000;
 
       final command = [
-        '-i',
-        inputPath,
         '-ss',
         startSeconds.toStringAsFixed(2),
+        '-i',
+        inputPath,
         '-t',
         durationSeconds.toStringAsFixed(2),
         '-c:v',
@@ -56,6 +149,7 @@ class FFmpegService {
         'fast',
         '-c:a',
         'aac',
+        '-y',
         outputPath,
       ];
 
@@ -99,20 +193,25 @@ class FFmpegService {
 
       _statusController.add('Mixing audio tracks...');
 
-      String filterComplex = '';
-      String inputs = '';
-
-      for (int i = 0; i < audioTracks.length; i++) {
-        inputs += '-i "${audioTracks[i]}" ';
-        filterComplex += '[$i]volume=0.5[a$i];';
+      final List<String> command = [];
+      for (var path in audioTracks) {
+        command.addAll(['-i', path]);
       }
 
+      String filterComplex = '';
+      for (int i = 0; i < audioTracks.length; i++) {
+        filterComplex += '[$i]volume=0.5[a$i];';
+      }
       filterComplex += audioTracks.asMap().entries.map((e) => '[a${e.key}]').join('');
       filterComplex += 'amix=inputs=${audioTracks.length}:duration=longest[out]';
 
-      final command = '$inputs -filter_complex "$filterComplex" -map "[out]" $outputPath';
+      command.addAll([
+        '-filter_complex', filterComplex,
+        '-map', '[out]',
+        '-y', outputPath
+      ]);
 
-      final session = await FFmpegKit.execute(command);
+      final session = await FFmpegKit.executeWithArguments(command);
       final returnCode = await session.getReturnCode();
 
       if (ReturnCode.isSuccess(returnCode)) {
@@ -145,6 +244,7 @@ class FFmpegService {
         inputPath,
         '-af',
         'rubberband=pitch=$pitch',
+        '-y',
         outputPath,
       ];
 
@@ -183,27 +283,21 @@ class FFmpegService {
 
       for (int i = 0; i < imagePaths.length; i++) {
         final duration = durationPerImageMs / 1000.0;
-        concat.write('file \'${imagePaths[i]}\'\n');
-        concat.write('duration $duration\n');
+        concat.write("file '${imagePaths[i]}'\n");
+        concat.write("duration $duration\n");
       }
 
       final concatFile = '${tempDir.path}/concat_${uuid.v4()}.txt';
       await _writeFile(concatFile, concat.toString());
 
       final command = [
-        '-f',
-        'concat',
-        '-safe',
-        '0',
-        '-i',
-        concatFile,
-        '-c:v',
-        'libx264',
-        '-pix_fmt',
-        'yuv420p',
-        '-r',
-        framerate.toString(),
-        outputPath,
+        '-f', 'concat',
+        '-safe', '0',
+        '-i', concatFile,
+        '-c:v', 'libx264',
+        '-pix_fmt', 'yuv420p',
+        '-r', framerate.toString(),
+        '-y', outputPath,
       ];
 
       final session = await FFmpegSession.create(
@@ -250,13 +344,10 @@ class FFmpegService {
       final filterComplex = 'chromakey=$colorHex:similarity=${similarity / 100}:blend=${blend / 100}';
 
       final command = [
-        '-i',
-        inputPath,
-        '-vf',
-        filterComplex,
-        '-c:a',
-        'copy',
-        outputPath,
+        '-i', inputPath,
+        '-vf', filterComplex,
+        '-c:a', 'copy',
+        '-y', outputPath,
       ];
 
       final session = await FFmpegKit.executeWithArguments(command);
@@ -291,18 +382,14 @@ class FFmpegService {
     try {
       _statusController.add('Adding watermark...');
 
-      final filterComplex = '''[0][1]overlay=$xPos:$yPos:enable='gte(t,0)':w=$width:h=$height''';
+      final filterComplex = '[1:v]scale=$width:$height[wm];[0:v][wm]overlay=$xPos:$yPos';
 
       final command = [
-        '-i',
-        inputPath,
-        '-i',
-        watermarkPath,
-        '-filter_complex',
-        filterComplex,
-        '-c:a',
-        'copy',
-        outputPath,
+        '-i', inputPath,
+        '-i', watermarkPath,
+        '-filter_complex', filterComplex,
+        '-c:a', 'copy',
+        '-y', outputPath,
       ];
 
       final session = await FFmpegKit.executeWithArguments(command);
@@ -336,17 +423,14 @@ class FFmpegService {
     try {
       _statusController.add('Adding text overlay...');
 
-      final escapedText = text.replaceAll("'", "\\'");
-      final filterComplex = '''drawtext=text='$escapedText':fontsize=$fontSize:fontcolor=$fontColor:x=$xPos:y=$yPos:fontfile=/system/fonts/DroidSans.ttf''';
+      final escapedText = text.replaceAll("'", "\\'").replaceAll(":", "\\:");
+      final filterComplex = "drawtext=text='$escapedText':fontsize=$fontSize:fontcolor=$fontColor:x=$xPos:y=$yPos";
 
       final command = [
-        '-i',
-        inputPath,
-        '-vf',
-        filterComplex,
-        '-c:a',
-        'copy',
-        outputPath,
+        '-i', inputPath,
+        '-vf', filterComplex,
+        '-c:a', 'copy',
+        '-y', outputPath,
       ];
 
       final session = await FFmpegKit.executeWithArguments(command);
@@ -379,7 +463,6 @@ class FFmpegService {
       _statusController.add('Resizing video...');
 
       String filterComplex;
-
       if (fitMode == 'scale') {
         filterComplex = 'scale=$width:$height';
       } else if (fitMode == 'pad') {
@@ -391,15 +474,11 @@ class FFmpegService {
       }
 
       final command = [
-        '-i',
-        inputPath,
-        '-vf',
-        filterComplex,
-        '-c:v',
-        'libx264',
-        '-c:a',
-        'aac',
-        outputPath,
+        '-i', inputPath,
+        '-vf', filterComplex,
+        '-c:v', 'libx264',
+        '-c:a', 'aac',
+        '-y', outputPath,
       ];
 
       final session = await FFmpegKit.executeWithArguments(command);
@@ -430,18 +509,12 @@ class FFmpegService {
       _statusController.add('Converting image to video...');
 
       final command = [
-        '-loop',
-        '1',
-        '-i',
-        imagePath,
-        '-c:v',
-        'libx264',
-        '-t',
-        durationSeconds.toString(),
-        '-pix_fmt',
-        'yuv420p',
-        '-y',
-        outputPath,
+        '-loop', '1',
+        '-i', imagePath,
+        '-c:v', 'libx264',
+        '-t', durationSeconds.toString(),
+        '-pix_fmt', 'yuv420p',
+        '-y', outputPath,
       ];
 
       final session = await FFmpegKit.executeWithArguments(command);
@@ -485,21 +558,14 @@ class FFmpegService {
               : '28';
 
       final command = [
-        '-i',
-        inputPath,
-        '-vf',
-        'scale=$resolution',
-        '-c:v',
-        'libx264',
-        '-preset',
-        preset,
-        '-crf',
-        crf,
-        '-c:a',
-        'aac',
-        '-b:a',
-        '128k',
-        outputPath,
+        '-i', inputPath,
+        '-vf', 'scale=$resolution',
+        '-c:v', 'libx264',
+        '-preset', preset,
+        '-crf', crf,
+        '-c:a', 'aac',
+        '-b:a', '128k',
+        '-y', outputPath,
       ];
 
       final session = await FFmpegSession.create(
@@ -508,7 +574,7 @@ class FFmpegService {
         null,
         (Statistics stats) {
           final time = stats.getTime();
-          _progressController.add(time / 30000.0);
+          _progressController.add((time / 30000.0).clamp(0.0, 1.0));
         },
       );
 
@@ -534,10 +600,7 @@ class FFmpegService {
   /// Get video information
   Future<Map<String, dynamic>?> getVideoInfo(String videoPath) async {
     try {
-      final session = await FFmpegKit.execute(
-        '-i $videoPath',
-      );
-
+      final session = await FFmpegKit.execute('-i "$videoPath"');
       final logs = await session.getLogsAsString();
       logger.i('Video info: $logs');
 
@@ -550,6 +613,11 @@ class FFmpegService {
       logger.e('Error getting video info: $e');
       return null;
     }
+  }
+
+  bool _isVideo(String path) {
+    final lower = path.toLowerCase();
+    return lower.endsWith('.mp4') || lower.endsWith('.mov') || lower.endsWith('.avi') || lower.endsWith('.mkv');
   }
 
   String _extractDuration(String logs) {
@@ -571,7 +639,9 @@ class FFmpegService {
   }
 
   Future<void> _writeFile(String path, String content) async {
-    logger.i('Writing file: $path');
+    final file = File(path);
+    await file.writeAsString(content);
+    logger.i('File written successfully: $path');
   }
 
   void dispose() {
