@@ -99,3 +99,19 @@ dependency_overrides:
       
 flutter:
   uses-material-design: true
+
+  # ১. সকল ইমেজ, GIF এবং থাম্বনেইল ফোল্ডার লিঙ্ক
+  assets:
+    - assets/images/
+    - assets/gifs/
+    - assets/thumbnails/
+
+  # ২. কাস্টম TTF ফন্ট লিঙ্ক (ফন্টের ক্ষেত্রে ফাইল পাথ স্পষ্ট করে দেওয়া ভালো)
+  fonts:
+    - family: Kalpurush
+      fonts:
+        - asset: assets/fonts/Kalpurush.ttf
+    - family: Baloo2
+      fonts:
+        - asset: assets/fonts/Baloo2-Regular.ttf
+        - asset: assets/fonts/Baloo2-Bold.ttf
