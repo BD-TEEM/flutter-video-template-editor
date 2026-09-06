@@ -28,14 +28,21 @@ class _ExportDialogState extends State<ExportDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            const Text(
               'Export Video',
-              style: Theme.of(context).textTheme.headlineSmall,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-            const SizedBox(height: 24),
-            Text(
-              'Quality',
-              style: Theme.of(context).textTheme.bodyLarge,
+            const SizedBox(height: 16),
+            const Text(
+              'Select Quality',
+              style: TextStyle(
+                color: Colors.grey,
+                fontSize: 14,
+              ),
             ),
             const SizedBox(height: 12),
             Column(
@@ -50,15 +57,15 @@ class _ExportDialogState extends State<ExportDialog> {
                   borderRadius: BorderRadius.circular(8),
                   child: Container(
                     margin: const EdgeInsets.symmetric(vertical: 4),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                     decoration: BoxDecoration(
                       color: isSelected
-                          ? Colors.blueAccent.withOpacity(0.2)
+                          ? Colors.cyanAccent.withOpacity(0.15)
                           : Colors.grey.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
                         color: isSelected
-                            ? Colors.blueAccent
+                            ? Colors.cyanAccent
                             : Colors.grey.withOpacity(0.2),
                       ),
                     ),
@@ -74,7 +81,7 @@ class _ExportDialogState extends State<ExportDialog> {
                               });
                             }
                           },
-                          activeColor: Colors.blueAccent,
+                          activeColor: Colors.cyanAccent,
                         ),
                         Text(
                           quality,
@@ -95,15 +102,32 @@ class _ExportDialogState extends State<ExportDialog> {
               children: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancel'),
+                  child: const Text(
+                    'Cancel',
+                    style: TextStyle(color: Colors.redAccent),
+                  ),
                 ),
                 const SizedBox(width: 12),
                 ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.cyanAccent,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
                   onPressed: () {
-                    // প্রথমে নির্বাচিত কোয়ালিটি রিটার্ন করবে
+                    // ১. প্রথমে এক্সপোর্ট ডায়ালগ বন্ধ করবে
+                    Navigator.pop(context);
+                    // ২. এরপর এক্সপোর্ট কলব্যাক ফাংশন রান করবে
                     widget.onExport(_selectedQuality);
                   },
-                  child: const Text('Export'),
+                  child: const Text(
+                    'Export',
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ],
             ),
