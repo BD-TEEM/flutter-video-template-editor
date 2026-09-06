@@ -36,7 +36,7 @@ void main() async {
 }
 
 class MyApp extends ConsumerWidget {
-  const MyApp({Key? key}) : super(key: key);
+  const MyApp({Key? key}) : super(Key? key);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -52,7 +52,7 @@ class MyApp extends ConsumerWidget {
 }
 
 class MainNavigation extends ConsumerStatefulWidget {
-  const MainNavigation({Key? key}) : super(key: key);
+  const MainNavigation({Key? key}) : super(Key? key);
 
   @override
   ConsumerState<MainNavigation> createState() => _MainNavigationState();
@@ -126,78 +126,58 @@ class _MainNavigationState extends ConsumerState<MainNavigation> {
   }
 }
 
+// ==========================================
+// ১. আপডেট করা হোম স্ক্রিন (ফোল্ডার ভিউ)
+// ==========================================
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({Key? key}) : super(key: key);
+  const HomeScreen({Key? key}) : super(Key? key);
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  String _selectedCategory = 'All';
-
-  final List<String> _categories = [
-    'All',
-    'Breaking News',
-    'Festival',
-    'Political',
-    'Sports',
-    'Entertainment',
-  ];
-
-  final List<Map<String, dynamic>> _templates = [
+  // ক্যাটাগরিগুলোকে এখন আলাদা ফোল্ডার আকারে সাজানো হলো
+  final List<Map<String, dynamic>> _folders = [
     {
-      'title': 'Breaking News Standard',
-      'category': 'Breaking News',
-      'tag': 'Hot',
+      'id': 'breaking',
+      'name': 'Breaking News',
+      'itemCount': 12,
       'color': Colors.redAccent,
       'icon': Icons.newspaper,
     },
     {
-      'title': 'Festival Greeting Banner',
-      'category': 'Festival',
-      'tag': 'New',
+      'id': 'festival',
+      'name': 'Festival Greeting',
+      'itemCount': 8,
       'color': Colors.orangeAccent,
       'icon': Icons.celebration,
     },
     {
-      'title': 'Election & Political Speech',
-      'category': 'Political',
-      'tag': 'Trending',
+      'id': 'political',
+      'name': 'Political & Speech',
+      'itemCount': 15,
       'color': Colors.blueAccent,
       'icon': Icons.how_to_vote,
     },
     {
-      'title': 'Sports Live Update',
-      'category': 'Sports',
-      'tag': 'Live',
+      'id': 'sports',
+      'name': 'Sports Live',
+      'itemCount': 10,
       'color': Colors.greenAccent,
       'icon': Icons.sports_cricket,
     },
     {
-      'title': 'Movie & Celeb Headline',
-      'category': 'Entertainment',
-      'tag': 'Popular',
+      'id': 'entertainment',
+      'name': 'Entertainment Headline',
+      'itemCount': 9,
       'color': Colors.purpleAccent,
       'icon': Icons.movie,
-    },
-    {
-      'title': 'Flash News Ticker',
-      'category': 'Breaking News',
-      'tag': 'Hot',
-      'color': Colors.redAccent,
-      'icon': Icons.flash_on,
     },
   ];
 
   @override
   Widget build(BuildContext context) {
-    final filteredTemplates = _selectedCategory == 'All'
-        ? _templates
-        : _templates
-            .where((t) => t['category'] == _selectedCategory)
-            .toList();
-
     return Scaffold(
       backgroundColor: const Color(0xFF121212),
       appBar: AppBar(
@@ -217,12 +197,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_none, color: Colors.white),
-            onPressed: () {},
-          ),
-        ],
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -290,186 +264,208 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
 
-            // Category Filter Pills
-            SizedBox(
-              height: 40,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: _categories.length,
-                itemBuilder: (context, index) {
-                  final cat = _categories[index];
-                  final isSelected = cat == _selectedCategory;
-                  return GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _selectedCategory = cat;
-                      });
-                    },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      margin: const EdgeInsets.only(right: 8),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: isSelected ? Colors.cyanAccent : const Color(0xFF2A2A2A),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: isSelected ? Colors.cyanAccent : Colors.white12,
-                        ),
-                      ),
-                      child: Center(
-                        child: Text(
-                          cat,
-                          style: TextStyle(
-                            color: isSelected ? Colors.black : Colors.white,
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                },
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Text(
+                'Template Categories (Folders)',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
-            const SizedBox(height: 20),
 
-            // Template Grid Section
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    '$_selectedCategory Templates',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Text(
-                    '${filteredTemplates.length} items',
-                    style: const TextStyle(color: Colors.grey, fontSize: 12),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-
+            // Category Folders Grid
             GridView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.all(16),
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
                 crossAxisSpacing: 12,
                 mainAxisSpacing: 12,
-                childAspectRatio: 0.85,
+                childAspectRatio: 1.1,
               ),
-              itemCount: filteredTemplates.length,
+              itemCount: _folders.length,
               itemBuilder: (context, index) {
-                final template = filteredTemplates[index];
+                final folder = _folders[index];
                 return GestureDetector(
                   onTap: () {
+                    // ফোল্ডারে ক্লিক করলে ফোল্ডারের পেজ খুলবে
                     Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const EditorScreen()),
+                      MaterialPageRoute(
+                        builder: (_) => CategoryTemplatesScreen(
+                          categoryName: folder['name'],
+                        ),
+                      ),
                     );
                   },
                   child: Container(
                     decoration: BoxDecoration(
                       color: const Color(0xFF1E1E1E),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey.withOpacity(0.15)),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.white10),
                     ),
-                    child: Stack(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Expanded(
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: (template['color'] as Color).withOpacity(0.15),
-                                  borderRadius: const BorderRadius.vertical(
-                                    top: Radius.circular(12),
-                                  ),
-                                ),
-                                child: Center(
-                                  child: Icon(
-                                    template['icon'] as IconData,
-                                    size: 48,
-                                    color: template['color'] as Color,
-                                  ),
-                                ),
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: (folder['color'] as Color).withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Icon(
+                                folder['icon'] as IconData,
+                                color: folder['color'] as Color,
+                                size: 28,
                               ),
                             ),
-                            Padding(
-                              padding: const EdgeInsets.all(10),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    template['title'],
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    template['category'],
-                                    style: const TextStyle(
-                                      color: Colors.grey,
-                                      fontSize: 11,
-                                    ),
-                                  ),
-                                ],
+                            const Icon(Icons.folder, color: Colors.amber),
+                          ],
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              folder['name'],
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${folder['itemCount']} Templates',
+                              style: const TextStyle(
+                                color: Colors.grey,
+                                fontSize: 12,
                               ),
                             ),
                           ],
-                        ),
-                        // Badge Tag
-                        Positioned(
-                          top: 8,
-                          left: 8,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: template['color'] as Color,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              template['tag'],
-                              style: const TextStyle(
-                                color: Colors.black,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                        // Favorite Icon
-                        Positioned(
-                          top: 4,
-                          right: 4,
-                          child: IconButton(
-                            icon: const Icon(Icons.favorite_border, size: 20, color: Colors.white),
-                            onPressed: () {},
-                          ),
-                        ),
+                        )
                       ],
                     ),
                   ),
                 );
               },
             ),
-            const SizedBox(height: 24),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ==========================================
+// ২. ফোল্ডারের ভেতরের টেমপ্লেট দেখানোর স্ক্রিন
+// ==========================================
+class CategoryTemplatesScreen extends StatelessWidget {
+  final String categoryName;
+
+  const CategoryTemplatesScreen({Key? key, required this.categoryName})
+      : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final List<Map<String, dynamic>> templates = [
+      {
+        'title': '$categoryName Main Layout',
+        'tag': 'Hot',
+        'color': Colors.redAccent,
+        'icon': Icons.movie_creation_outlined,
+      },
+      {
+        'title': '$categoryName Ticker Frame',
+        'tag': 'New',
+        'color': Colors.cyanAccent,
+        'icon': Icons.slideshow,
+      },
+      {
+        'title': '$categoryName Studio Style',
+        'tag': 'Pro',
+        'color': Colors.purpleAccent,
+        'icon': Icons.video_label,
+      },
+    ];
+
+    return Scaffold(
+      backgroundColor: const Color(0xFF121212),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF1E1E1E),
+        title: Text(categoryName),
+      ),
+      body: GridView.builder(
+        padding: const EdgeInsets.all(16),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          childAspectRatio: 0.85,
+        ),
+        itemCount: templates.length,
+        itemBuilder: (context, index) {
+          final template = templates[index];
+          return GestureDetector(
+            onTap: () {
+              // মূল অরিজিনাল টেমপ্লেটে ক্লিক করলে Editor Screen ওপেন হবে
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const EditorScreen()),
+              );
+            },
+            child: Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E1E1E),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: (template['color'] as Color).withOpacity(0.15),
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(12),
+                        ),
+                      ),
+                      child: Center(
+                        child: Icon(
+                          template['icon'] as IconData,
+                          size: 48,
+                          color: template['color'] as Color,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(10),
+                    child: Text(
+                      template['title'],
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }
