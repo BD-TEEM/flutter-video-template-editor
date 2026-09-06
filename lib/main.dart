@@ -5,7 +5,7 @@ import 'package:news_template_maker/core/theme/app_theme.dart';
 import 'package:news_template_maker/core/constants/app_constants.dart';
 import 'package:news_template_maker/features/editor/presentation/pages/editor_screen.dart';
 // ১. নতুন তৈরি করা গ্যালারি স্ক্রিন ইমপোর্ট করা হলো
-import 'package:news_template_maker/features/home/presentation/pages/multi_format_gallery_screen.dart';
+import 'package:news_template_maker/features/editor/presentation/pages/multi_format_gallery_screen.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 Future<void> requestPermissions() async {
