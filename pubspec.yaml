@@ -107,11 +107,38 @@ flutter:
     - assets/thumbnails/
 
   # ২. কাস্টম TTF ফন্ট লিঙ্ক (ফন্টের ক্ষেত্রে ফাইল পাথ স্পষ্ট করে দেওয়া ভালো)
-  fonts:
-    - family: Kalpurush
-      fonts:
-        - asset: assets/fonts/Kalpurush.ttf
+    fonts:
     - family: Baloo2
       fonts:
         - asset: assets/fonts/Baloo2-Regular.ttf
         - asset: assets/fonts/Baloo2-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Baloo2-ExtraBold.ttf
+          weight: 800
+
+    - family: Hind
+      fonts:
+        - asset: assets/fonts/Hind-Light.ttf
+          weight: 300
+        - asset: assets/fonts/Hind-Bold.ttf
+          weight: 700
+
+    - family: Mukta
+      fonts:
+        - asset: assets/fonts/Mukta-Regular.ttf
+        - asset: assets/fonts/Mukta-Bold.ttf
+          weight: 700
+
+    - family: Poppins
+      fonts:
+        - asset: assets/fonts/Poppins-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Poppins-BoldItalic.ttf
+          style: italic
+          weight: 700
+
+    - family: TiroDevanagariHindi
+      fonts:
+        - asset: assets/fonts/TiroDevanagariHindi-Regular.ttf
+        - asset: assets/fonts/TiroDevanagariHindi-Italic.ttf
+          style: italic
