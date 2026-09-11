@@ -1,13 +1,14 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:news_template_maker/features/editor/presentation/pages/editor_screen.dart';
-import 'package:news_template_maker/features/editor/presentation/widgets/news_template_designs.dart';
 
 enum AspectRatioType { vertical916, horizontal169 }
 
 class MultiFormatGalleryScreen extends StatefulWidget {
   final String categoryName;
 
-  const MultiFormatGalleryScreen({Key? key, this.categoryName = 'All'}) : super(Key: key);
+  const MultiFormatGalleryScreen({Key? key, this.categoryName = 'All'}) : super(key: key);
 
   @override
   State<MultiFormatGalleryScreen> createState() => _MultiFormatGalleryScreenState();
@@ -16,72 +17,38 @@ class MultiFormatGalleryScreen extends StatefulWidget {
 class _MultiFormatGalleryScreenState extends State<MultiFormatGalleryScreen> {
   AspectRatioType _selectedRatio = AspectRatioType.vertical916;
 
-  // Master Template List with category tags
-  final List<Map<String, dynamic>> _allTemplates = [
-    // 9:16 Vertical Templates
-    {
-      'id': 'v1',
-      'title': 'Split Comparison News',
-      'category': 'Politics',
-      'aspectRatio': AspectRatioType.vertical916,
-      'builder': (context) => NewsTemplateDesigns.buildSplitComparisonTemplate(context, {
-            'mainHeader': 'POLITICAL DEBATE',
-            'footerText': 'Both leaders respond to national election claims.',
-          }),
-    },
-    {
-      'id': 'v2',
-      'title': 'Cyberpunk Reel Alert',
-      'category': 'Technology',
-      'aspectRatio': AspectRatioType.vertical916,
-      'builder': (context) => NewsTemplateDesigns.buildCyberpunkReelTemplate(context, {
-            'newsBody': 'Tech Stocks reach record high in market surge.',
-          }),
-    },
-    {
-      'id': 'v3',
-      'title': 'Breaking News Reel',
-      'category': 'Breaking News',
-      'aspectRatio': AspectRatioType.vertical916,
-      'builder': (context) => NewsTemplateDesigns.buildSplitComparisonTemplate(context, {
-            'mainHeader': 'BREAKING NEWS',
-            'footerText': 'Major developments unfolding right now.',
-          }),
-    },
+  // গিটহাবের সরাসরি Raw JSON লিংক
+  final String _githubUrl = 'https://raw.githubusercontent.com/BD-TEEN/news-templates/main/template.json';
 
-    // 16:9 Horizontal Templates
-    {
-      'id': 'h1',
-      'title': 'Studio Anchor TV Live',
-      'category': 'Studio',
-      'aspectRatio': AspectRatioType.horizontal169,
-      'builder': (context) => NewsTemplateDesigns.buildStudioAnchor169(context, {
-            'tickerText': 'URGENT: Prime Minister announces new policy changes.',
-          }),
-    },
-    {
-      'id': 'h2',
-      'title': 'Minimalist World News',
-      'category': 'International',
-      'aspectRatio': AspectRatioType.horizontal169,
-      'builder': (context) => NewsTemplateDesigns.buildMinimalistBroadcast169(context, {
-            'category': 'INTERNATIONAL',
-            'headline': 'Global Summit discussions begin on environment.',
-          }),
-    },
-  ];
+  List<dynamic> _templates = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchGithubTemplates();
+  }
+
+  // গিটহাব থেকে টেমপ্লেট ফেচ করার ফাংশন
+  Future<void> _fetchGithubTemplates() async {
+    try {
+      final response = await http.get(Uri.parse(_githubUrl));
+      if (response.statusCode == 200) {
+        setState(() {
+          _templates = jsonDecode(response.body);
+          _isLoading = false;
+        });
+      } else {
+        setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      debugPrint('Error loading templates: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    // Dynamically Filter Templates by Category & Selected Aspect Ratio
-    final activeTemplates = _allTemplates.where((template) {
-      bool matchRatio = template['aspectRatio'] == _selectedRatio;
-      bool matchCategory = widget.categoryName == 'All' ||
-          widget.categoryName == 'Templates' ||
-          template['category'].toString().toLowerCase() == widget.categoryName.toLowerCase();
-      return matchRatio && matchCategory;
-    }).toList();
-
     return Scaffold(
       backgroundColor: const Color(0xFF121212),
       appBar: AppBar(
@@ -91,6 +58,7 @@ class _MultiFormatGalleryScreenState extends State<MultiFormatGalleryScreen> {
       body: Column(
         children: [
           const SizedBox(height: 12),
+          
           // Aspect Ratio Switcher Controls
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -126,78 +94,95 @@ class _MultiFormatGalleryScreenState extends State<MultiFormatGalleryScreen> {
 
           // Dynamic Template Grid Display
           Expanded(
-            child: activeTemplates.isNotEmpty
-                ? GridView.builder(
-                    padding: const EdgeInsets.all(12),
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: _selectedRatio == AspectRatioType.vertical916 ? 2 : 1,
-                      childAspectRatio: _selectedRatio == AspectRatioType.vertical916 ? (9 / 16) : (16 / 9),
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
-                    ),
-                    itemCount: activeTemplates.length,
-                    itemBuilder: (context, index) {
-                      final template = activeTemplates[index];
-                      final Widget Function(BuildContext) builder = template['builder'];
+            child: _isLoading
+                ? const Center(
+                    child: CircularProgressIndicator(color: Colors.cyanAccent),
+                  )
+                : _templates.isNotEmpty
+                    ? GridView.builder(
+                        padding: const EdgeInsets.all(12),
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: _selectedRatio == AspectRatioType.vertical916 ? 2 : 1,
+                          childAspectRatio: _selectedRatio == AspectRatioType.vertical916 ? (9 / 16) : (16 / 9),
+                          crossAxisSpacing: 12,
+                          mainAxisSpacing: 12,
+                        ),
+                        itemCount: _templates.length,
+                        itemBuilder: (context, index) {
+                          final template = _templates[index];
+                          
+                          // গিটহাবের ইমেজ লিংক তৈরি করা (base_url + json['img'])
+                          final baseUrl = template['base_url'] ?? '';
+                          final imgName = template['json']?['img'] ?? '';
+                          final imageUrl = '$baseUrl$imgName';
 
-                      return GestureDetector(
-                        onTap: () {
-                          // Navigate to Editor with selected template info
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => const EditorScreen(),
+                          return GestureDetector(
+                            onTap: () {
+                              // নেভিগেট করে এডিটর স্ক্রিনে টেমপ্লেটের ডাটা পাঠানো
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => const EditorScreen(),
+                                ),
+                              );
+                            },
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1E1E1E),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.white12),
+                              ),
+                              clipBehavior: Clip.antiAlias,
+                              child: Stack(
+                                children: [
+                                  // গিটহাব থেকে থাম্বনেইল ছবি লোড
+                                  Positioned.fill(
+                                    child: Image.network(
+                                      imageUrl,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) => const Center(
+                                        child: Icon(Icons.video_library, size: 40, color: Colors.grey),
+                                      ),
+                                    ),
+                                  ),
+                                  Positioned(
+                                    bottom: 0,
+                                    left: 0,
+                                    right: 0,
+                                    child: Container(
+                                      color: Colors.black.withOpacity(0.75),
+                                      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+                                      child: Text(
+                                        template['name'] ?? 'Template',
+                                        textAlign: TextAlign.center,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           );
                         },
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF1E1E1E),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.white12),
-                          ),
-                          clipBehavior: Clip.antiAlias,
-                          child: Stack(
-                            children: [
-                              Positioned.fill(child: builder(context)),
-                              Positioned(
-                                bottom: 0,
-                                left: 0,
-                                right: 0,
-                                child: Container(
-                                  color: Colors.black.withOpacity(0.75),
-                                  padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-                                  child: Text(
-                                    template['title'],
-                                    textAlign: TextAlign.center,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
+                      )
+                    : Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.folder_open, size: 48, color: Colors.grey),
+                            const SizedBox(height: 12),
+                            Text(
+                              'No templates found for "${widget.categoryName}"',
+                              style: const TextStyle(color: Colors.grey, fontSize: 14),
+                            ),
+                          ],
                         ),
-                      );
-                    },
-                  )
-                : Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.folder_open, size: 48, color: Colors.grey),
-                        const SizedBox(height: 12),
-                        Text(
-                          'No templates found for "${widget.categoryName}"',
-                          style: const TextStyle(color: Colors.grey, fontSize: 14),
-                        ),
-                      ],
-                    ),
-                  ),
+                      ),
           ),
         ],
       ),
