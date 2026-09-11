@@ -96,7 +96,7 @@ dependency_overrides:
     git:
       url: https://github.com/fluttercommunity/flutter_workmanager.git
       path: workmanager
-      
+
 flutter:
   uses-material-design: true
 
@@ -106,8 +106,8 @@ flutter:
     - assets/gifs/
     - assets/thumbnails/
 
-  # ২. কাস্টম TTF ফন্ট লিঙ্ক (ফন্টের ক্ষেত্রে ফাইল পাথ স্পষ্ট করে দেওয়া ভালো)
-    fonts:
+  # ২. কাস্টম TTF ফন্ট লিঙ্ক
+  fonts:
     - family: Baloo2
       fonts:
         - asset: assets/fonts/Baloo2-Regular.ttf
@@ -142,3 +142,4 @@ flutter:
         - asset: assets/fonts/TiroDevanagariHindi-Regular.ttf
         - asset: assets/fonts/TiroDevanagariHindi-Italic.ttf
           style: italic
+          
